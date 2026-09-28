@@ -5,11 +5,15 @@ from app.database import check_database
 from app.config import load_settings
 from app.routes_auth import router as auth_router
 from app.routes_finance import router as finance_router
+from app.routes_dashboard import router as dashboard_router
+from app.routes_investments import router as investments_router
 
 load_settings()
 app = FastAPI(title="Personal AI Wealth Manager", version="0.1.0")
 app.include_router(auth_router)
 app.include_router(finance_router)
+app.include_router(dashboard_router)
+app.include_router(investments_router)
 
 
 @app.get("/health/live")

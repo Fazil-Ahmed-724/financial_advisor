@@ -1,10 +1,10 @@
 # Personal AI Wealth Manager
 
-Phase 1, Parts 1–3: Dockerized FastAPI and PostgreSQL, Alembic migrations, authentication, user-owned PKR accounts, a balanced journal, and an Expo mobile client.
+Phase 1, Parts 1–5: Dockerized FastAPI and PostgreSQL, Alembic migrations, authentication, a balanced PKR ledger, emergency-reserve dashboard, external investment records, FIFO cost basis, estimate-only sale analysis, and an Expo mobile client.
 
 ## Initial inspection
 
-The supplied repository contained only `.git`, with no commits or tracked files. Part 1 created the Docker/backend/mobile foundation, Part 2 added authentication, and Part 3 adds accounts and deterministic double-entry records. Stock trades, market values, books, recommendations, notifications, and broker integrations are not implemented. Tables are created only by Alembic migrations; application code never calls `Base.metadata.create_all()`.
+The supplied repository contained only `.git`, with no commits or tracked files. Parts 1–4 established the environment, authentication, ledger, and reserve dashboard. Part 5 records trades completed outside the app, tracks FIFO book cost, and stores hypothetical sale estimates. The app cannot submit, route, or execute an order. Live market values, books, recommendations, notifications, and broker integrations are not implemented. Tables are created only by Alembic migrations; application code never calls `Base.metadata.create_all()`.
 
 ## Requirements
 
@@ -55,7 +55,7 @@ docker compose run --rm api alembic check
 docker compose run --rm api alembic revision --autogenerate -m "describe change"
 ```
 
-Review every generated migration before applying it. `downgrade` can destroy data and is intentionally omitted from the normal development workflow. Revision `20260929_0001` creates users. Revision `20260929_0002` creates accounts, journal entries/lines, idempotency records, ownership constraints, and deferred balance checks.
+Review every generated migration before applying it. `downgrade` can destroy data and is intentionally omitted from the normal development workflow. Revision `20260929_0001` creates users. Revision `20260929_0002` creates the ledger. Revision `20260929_0003` creates financial profiles. Revision `20260929_0004` adds external investment trades, FIFO lots and consumptions, effective-dated tax rules, and stored sale analyses.
 
 The test profile uses a separate `test-db` PostgreSQL service with a temporary in-memory data directory. Its command downgrades to the empty base and upgrades to `head` before every test run. It does not connect to the development database or mount `postgres_data`.
 
@@ -140,6 +140,54 @@ Invoke-RestMethod -Method Post -Uri http://localhost:8000/journal-entries `
 Invoke-RestMethod http://localhost:8000/accounts/balances -Headers $headers
 ```
 
+## Emergency reserve and dashboard API
+
+All routes require a bearer token and return PKR decimal values as strings. The profile accepts nonnegative monthly essential expenses with at most two decimal places and reserve months from `0` through `24`.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/financial-profile` | Read monthly essential expenses and reserve months |
+| `PUT` | `/financial-profile` | Update the authenticated user's reserve settings |
+| `GET` | `/dashboard` | Return ledger-derived cash, liabilities, reserve, and book-value totals |
+
+Dashboard signs follow the Part 3 ledger. Cash and investment assets use their debit-positive raw balances. Liability accounts normally have credit balances, so the API negates their raw totals and presents amounts owed as positive values. Income and expense accounts are already reflected through their balancing asset lines and are not added again. Therefore:
+
+- `net_worth_book_value = cash_balance + investment_book_value - liability_balance`
+- `reserve_target = monthly_essential_expenses × reserve_months`
+- `protected_emergency_cash = min(max(cash_balance, 0), reserve_target)`
+- `investable_cash = max(max(cash_balance, 0) - protected_emergency_cash - max(liability_balance, 0), 0)`
+
+All recorded liabilities are treated as current obligations in this phase because the ledger does not yet classify maturity dates. Investment and net-worth values are explicitly ledger/book values. The response includes `valuation_basis: ledger_book_value` and `market_values_available: false`; it does not estimate current market prices, returns, or allocation.
+
+```powershell
+$profile = @{
+  monthly_essential_expenses = '50000.00'
+  reserve_months = 6
+} | ConvertTo-Json
+
+Invoke-RestMethod -Method Put -Uri http://localhost:8000/financial-profile `
+  -Headers $headers -ContentType 'application/json' -Body $profile
+
+Invoke-RestMethod -Uri http://localhost:8000/dashboard -Headers $headers
+```
+
+## External investment records and FIFO analysis
+
+These routes require authentication. All POST routes require `Idempotency-Key`. The application records completed external transactions and performs estimates; it has no broker connector or order-execution route.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST`, `GET` | `/investment-trades` | Record or list completed external BUY/SELL transactions |
+| `GET` | `/holdings` | List quantities, remaining FIFO book cost, realized gain/loss, and open lots |
+| `POST`, `GET` | `/tax-rules` | Configure or list user-supplied, effective-dated gain-tax assumptions |
+| `POST`, `GET` | `/sale-analyses` | Store or review estimate-only hypothetical FIFO sale calculations |
+
+A BUY debits investment book value for execution value plus purchase fees and credits cash. A SELL consumes eligible lots by acquisition date, then creation order and lot ID. Full-lot consumption uses the exact remaining cost; partial consumption allocates remaining cost proportionally and rounds half-up to PKR cents. Sale fees reduce proceeds. The journal credits investment by FIFO cost and posts the resulting realized gain or loss to automatically created user-owned income or expense accounts. Holdings are explanatory records and are never added to dashboard totals, preventing double-counting.
+
+Trade quantities support eight decimal places, prices four, and PKR amounts two. Completed trades cannot be future-dated. External sales require sufficient quantity acquired by the sale date. Record trades chronologically because a later-entered backdated purchase does not recalculate an already recorded sale.
+
+Hypothetical analysis does not consume lots or change ledger balances. Gross profit/loss is gross proceeds minus FIFO cost. Net profit/loss also subtracts entered fees and configured estimated tax. No Pakistani rate is supplied by the application. With no applicable rule, `estimated_tax` is `null` and status is `not_configured`. A configured rate applies only to a positive estimate after fees; a loss produces zero estimated tax and never assumes a credit or refund. Any user-entered loss-treatment note is shown separately. Each result stores FIFO allocations, assumptions, exclusions, calculation time, `estimate_only`, and `order_placed: false`.
+
 ```powershell
 # Follow logs (Ctrl+C stops following, not the services)
 docker compose logs --follow --tail 100 api db
@@ -193,7 +241,7 @@ For a phone, use `ipconfig` to find the PC's active Wi-Fi/Ethernet IPv4 address.
 
 If you change `API_PORT`, update the mobile URL too. After changing the mobile environment, fully reload the app; restarting with `npx.cmd expo start --clear` also clears Metro's cache. An Expo tunnel exposes Metro, not this backend. These HTTP URLs are for local Expo Go development; standalone release builds need a separately configured HTTPS backend.
 
-The mobile app uses Expo Router and offers registration/login, account creation, opening/income/expense entry screens, server-fetched account choices, and refreshed balances. The access token is encrypted with Expo SecureStore and restricted to the current device where supported. Native device behavior still needs a manual emulator/phone smoke test. Web development is not configured because SecureStore targets Android and iOS.
+The mobile app uses Expo Router and offers registration/login, the book-value dashboard, reserve settings, ledger entry, completed external-trade recording, FIFO holdings/lots, and hypothetical sale analysis. The trade screen explicitly states that it records a transaction executed elsewhere; the analysis screen states that it places no order. Returning to the dashboard or holdings refreshes API values. The access token is encrypted with Expo SecureStore and restricted to the current device where supported. Native device behavior still needs a manual emulator/phone smoke test.
 
 ## Checks
 
@@ -208,7 +256,7 @@ docker compose exec api python -c "from app.database import check_database; chec
 Invoke-RestMethod http://localhost:8000/health/ready
 ```
 
-Backend tests cover clean migration history, schema/model consistency, authentication, all account types, normalization, balanced entries, invalid amounts and precision, ownership isolation, idempotent replay/conflicts, balance calculations, API rollback, database-trigger rollback, health checks, and safe errors. Tests mutate only the isolated temporary test database.
+Backend tests cover all earlier behavior plus multi-lot and partial FIFO consumption, purchase/sale fees, gains/losses, insufficient holdings, precision, ownership, idempotency, rollback, dashboard consistency, non-mutating analyses, configured/unconfigured tax, loss handling, and absence of broker-order routes. Tests mutate only the isolated temporary test database.
 
 ```powershell
 Set-Location mobile
@@ -220,8 +268,8 @@ npx.cmd expo-doctor
 
 ## Remaining work
 
-See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), and [Part 3](docs/part-3-report.md) verification reports.
+See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), [Part 3](docs/part-3-report.md), [Part 4](docs/part-4-report.md), and [Part 5](docs/part-5-report.md) verification reports.
 
-Part 3 is complete. Parts 4–8 cover reserves/dashboard, FIFO investment records, multi-device alerts, authorized book library, and integration/release checks. Expo push credentials, notification testing on real phones, user-provided book files, and OCR decisions belong to those later parts.
+Part 5 is complete. Parts 6–8 cover multi-device alerts, the authorized book library, and integration/release checks. Expo push credentials, notification testing on real phones, user-provided book files, and OCR decisions belong to those later parts.
 
 References: [Compose startup and health checks](https://docs.docker.com/compose/how-tos/startup-order/), [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/), and [Expo environment variables](https://docs.expo.dev/guides/environment-variables/).

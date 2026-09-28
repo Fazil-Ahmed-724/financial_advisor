@@ -11,7 +11,7 @@ from app.auth import (
     verify_password,
 )
 from app.config import load_settings
-from app.models import User
+from app.models import FinancialProfile, User
 from app.schemas import Credentials, RegistrationResponse, TokenResponse, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
@@ -37,6 +37,8 @@ def register(credentials: Credentials, session: Session = Depends(get_session)):
     user = User(email=email, password_hash=hash_password(credentials.password))
     session.add(user)
     try:
+        session.flush()
+        session.add(FinancialProfile(user_id=user.id))
         session.commit()
     except IntegrityError:
         session.rollback()
