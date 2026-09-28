@@ -1,0 +1,83 @@
+name: personal-ai-wealth-manager
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Copy .env.example to .env first}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./backend
+      target: runtime
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      APP_ENV: ${APP_ENV:-development}
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env}
+      ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-15}
+    ports:
+      - "${API_BIND_HOST:-127.0.0.1}:${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    restart: unless-stopped
+    command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+
+  test-db:
+    profiles: ["test"]
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: wealth_manager_test
+      POSTGRES_USER: wealth_test
+      POSTGRES_PASSWORD: test_database_password
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U wealth_test -d wealth_manager_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 5s
+
+  test:
+    profiles: ["test"]
+    build:
+      context: ./backend
+      target: test
+    environment:
+      POSTGRES_HOST: test-db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: wealth_manager_test
+      POSTGRES_USER: wealth_test
+      POSTGRES_PASSWORD: test_database_password
+      APP_ENV: test
+      AUTH_SECRET: test_auth_secret_which_is_long_enough_1234567890abcdef
+      ACCESS_TOKEN_MINUTES: "15"
+    depends_on:
+      test-db:
+        condition: service_healthy
+    command: ["sh", "-c", "alembic downgrade base && alembic upgrade head && python -m pytest -q -p no:cacheprovider"]
+
+volumes:
+  postgres_data:

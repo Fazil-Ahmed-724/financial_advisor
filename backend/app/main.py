@@ -1,0 +1,30 @@
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+
+from app.database import check_database
+from app.config import load_settings
+from app.routes_auth import router as auth_router
+from app.routes_finance import router as finance_router
+
+load_settings()
+app = FastAPI(title="Personal AI Wealth Manager", version="0.1.0")
+app.include_router(auth_router)
+app.include_router(finance_router)
+
+
+@app.get("/health/live")
+def liveness() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/health/ready")
+def readiness() -> JSONResponse:
+    try:
+        check_database()
+    except Exception:
+        # Never disclose connection strings, passwords, or internal errors.
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unavailable", "database": "unavailable"},
+        )
+    return JSONResponse(content={"status": "ok", "database": "connected"})
