@@ -14,6 +14,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -412,3 +413,74 @@ class DecisionPassage(Base):
     passage_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     note: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class OpportunityAnalysis(Base):
+    __tablename__ = "opportunity_analyses"
+    __table_args__ = (UniqueConstraint("id", "user_id", name="uq_opportunity_analyses_id_user_id"),)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    domain: Mapped[str] = mapped_column(String(50), index=True)
+    source: Mapped[str] = mapped_column(String(200))
+    source_reference: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    input_snapshot: Mapped[dict] = mapped_column(JSON)
+    source_evidence: Mapped[dict] = mapped_column(JSON)
+    assumptions: Mapped[dict] = mapped_column(JSON)
+    calculated_metrics: Mapped[dict] = mapped_column(JSON)
+    recommendation: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    limitations: Mapped[list] = mapped_column(JSON)
+    analyzer_version: Mapped[str] = mapped_column(String(50))
+    calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PropertyListing(Base):
+    __tablename__ = "property_listings"
+    __table_args__ = (
+        CheckConstraint("city = 'Karachi'", name="ck_property_listings_karachi"),
+        CheckConstraint("purpose IN ('sale', 'rent')", name="ck_property_listings_purpose"),
+        CheckConstraint("area_amount > 0 AND asking_amount > 0", name="ck_property_listings_positive_values"),
+        CheckConstraint("area_unit IN ('sq_ft','sq_yd','marla_225_sq_ft','marla_272_25_sq_ft','kanal_4500_sq_ft','kanal_5445_sq_ft')", name="ck_property_listings_area_unit"),
+        UniqueConstraint("id", "user_id", name="uq_property_listings_id_user_id"),
+        Index("uq_property_listings_user_url", "user_id", "canonical_url", unique=True, postgresql_where=text("canonical_url IS NOT NULL")),
+        Index("uq_property_listings_user_source_id", "user_id", "source_name", "source_id", unique=True, postgresql_where=text("source_id IS NOT NULL")),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    city: Mapped[str] = mapped_column(String(50), default="Karachi")
+    source_type: Mapped[str] = mapped_column(String(30))
+    source_name: Mapped[str] = mapped_column(String(200))
+    canonical_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    source_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    listing_status: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    purpose: Mapped[str] = mapped_column(String(10), index=True)
+    property_type: Mapped[str] = mapped_column(String(80), index=True)
+    area_name: Mapped[str] = mapped_column(String(200), index=True)
+    area_amount: Mapped[Decimal] = mapped_column(Numeric(18, 4))
+    area_unit: Mapped[str] = mapped_column(String(30))
+    asking_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2))
+    attributes: Mapped[dict] = mapped_column(JSON)
+    information_quality: Mapped[str] = mapped_column(String(30))
+    owned_by_user: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    confirmed_valuation: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    valuation_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PropertyAnalysis(Base):
+    __tablename__ = "property_analyses"
+    __table_args__ = (CheckConstraint("analysis_type IN ('comparables','yield')", name="ck_property_analyses_type"),)
+    analysis_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("opportunity_analyses.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    analysis_type: Mapped[str] = mapped_column(String(20))
+    comparable_count: Mapped[int | None] = mapped_column(nullable=True)
+    median_asking_amount: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    minimum_asking_amount: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    maximum_asking_amount: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    purchase_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    monthly_rent: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    annual_expenses: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    annual_tax_assumption: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    gross_yield_percent: Mapped[Decimal | None] = mapped_column(Numeric(9, 4), nullable=True)
+    net_yield_percent: Mapped[Decimal | None] = mapped_column(Numeric(9, 4), nullable=True)

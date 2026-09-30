@@ -4,7 +4,7 @@ Phase 1, Parts 1–7: Dockerized FastAPI and PostgreSQL, authentication, a balan
 
 ## Initial inspection
 
-The supplied repository contained only `.git`, with no commits or tracked files. Parts 1–4 established the environment, authentication, ledger, and reserve dashboard. Part 5 records trades completed outside the app, tracks FIFO book cost, and stores hypothetical sale estimates. The app cannot submit, route, or execute an order. Live market values, books, recommendations, notifications, and broker integrations are not implemented. Tables are created only by Alembic migrations; application code never calls `Base.metadata.create_all()`.
+The supplied repository contained only `.git`, with no commits or tracked files. Parts 1–8 established the environment, authentication, ledger and reserve dashboard, external trade records and FIFO cost basis, decision reviews, a private cited book library, and user-supplied Karachi property research. The app cannot submit, route, or execute an order. Live market values, automated listing collection, recommendations, notifications, and broker integrations are not implemented. Tables are created only by Alembic migrations; application code never calls `Base.metadata.create_all()`.
 
 ## Requirements
 
@@ -257,9 +257,34 @@ For a phone, use `ipconfig` to find the PC's active Wi-Fi/Ethernet IPv4 address.
 
 If you change `API_PORT`, update the mobile URL too. After changing the mobile environment, fully reload the app; restarting with `npx.cmd expo start --clear` also clears Metro's cache. An Expo tunnel exposes Metro, not this backend. These HTTP URLs are for local Expo Go development; standalone release builds need a separately configured HTTPS backend.
 
-The mobile app uses Expo Router and offers registration/login, the book-value dashboard, reserve settings, ledger entry, external-trade recording, FIFO holdings/lots, hypothetical analysis, and decision list/detail/review screens. The original thesis and financial outcome are displayed separately, and all investment screens state that the app places no orders. The access token is encrypted with Expo SecureStore. Native behavior still needs an emulator or physical-phone smoke test.
+The mobile app uses Expo Router and offers registration/login, the book-value dashboard, reserve settings, ledger entry, external-trade recording, FIFO holdings/lots, hypothetical analysis, decision list/detail/review, private book-library, and Karachi property-research screens. The original thesis and financial outcome are displayed separately, and all investment and opportunity screens state that the app places no orders. The access token is encrypted with Expo SecureStore. Native behavior still needs an emulator or physical-phone smoke test.
 
 ## Checks
+
+## Extensible opportunity analysis and Karachi property research
+
+The authenticated opportunity API uses a domain/analyzer registry and a source-adapter boundary so later research domains can be added without mixing their records or rules into the finance ledger. Part 8 registers only `karachi_real_estate`, with manual or authorized-export listing entry. A supplied Zameen or other HTTP(S) URL is normalized and stored as provenance; the service does not fetch or crawl it.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/opportunities/domains` | List registered research domains |
+| `POST`, `GET` | `/opportunities/karachi-real-estate/listings` | Record or filter user-owned Karachi listing research |
+| `POST` | `/opportunities/analyze/karachi_real_estate/comparables` | Calculate asking-price range and median when at least three records match |
+| `POST` | `/opportunities/analyze/karachi_real_estate/yield` | Calculate gross yield and, when all costs are supplied, net yield |
+
+Listing writes and analysis writes require `Idempotency-Key`. Records preserve source name/reference, observation time, normalized input, evidence listing IDs and dates, assumptions, exact Decimal metrics, analyzer version, and limitations. Asking prices are labeled unverified and never treated as completed transactions. Records older than 90 days are labeled stale. Area units must be explicit: `sq_ft`, `sq_yd`, one of the two named marla definitions, or one of the two named kanal definitions.
+
+Gross annual yield is `(monthly rent × 12) / purchase price × 100`. Net yield is unavailable until the user supplies both annual expense assumptions and an annual property-tax assumption; the app supplies no tax rate, legal conclusion, vacancy rate, or transaction cost. Results are estimates with no recommendation, offer, order, or broker action.
+
+Property research does not change ledger cash, investment book value, emergency reserves, or investable cash. The dashboard retains ledger-only `net_worth_book_value` and separately reports `confirmed_property_value` and `net_worth_with_confirmed_property`. A property value is included there only when the listing is marked user-owned and has an explicitly confirmed valuation and confirmation timestamp.
+
+Apply and verify the migration in PowerShell:
+
+```powershell
+docker compose run --rm migrate
+docker compose exec api alembic current
+docker compose exec api alembic check
+```
 
 ## Personal financial book library
 
@@ -301,8 +326,8 @@ npx.cmd expo-doctor
 
 ## Remaining work
 
-See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), [Part 3](docs/part-3-report.md), [Part 4](docs/part-4-report.md), [Part 5](docs/part-5-report.md), [Part 6](docs/part-6-report.md), and [Part 7](docs/part-7-report.md) verification reports.
+See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), [Part 3](docs/part-3-report.md), [Part 4](docs/part-4-report.md), [Part 5](docs/part-5-report.md), [Part 6](docs/part-6-report.md), [Part 7](docs/part-7-report.md), and [Part 8](docs/part-8-report.md) verification reports.
 
-Part 7 is complete. Integration/release checks remain. OCR, market data, paid models, book downloading, and broker connectivity are not implemented.
+Part 8 is complete. Broader integration/release checks remain. Automated listing collection, confirmed transaction feeds, market data, legal/title verification, recommendations, offers, orders, and broker connectivity are not implemented.
 
 References: [Compose startup and health checks](https://docs.docker.com/compose/how-tos/startup-order/), [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/), and [Expo environment variables](https://docs.expo.dev/guides/environment-variables/).

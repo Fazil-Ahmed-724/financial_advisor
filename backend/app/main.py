@@ -9,6 +9,7 @@ from app.routes_dashboard import router as dashboard_router
 from app.routes_investments import router as investments_router
 from app.routes_decisions import router as decisions_router
 from app.routes_books import router as books_router
+from app.routes_opportunities import router as opportunities_router
 
 load_settings()
 app = FastAPI(title="Personal AI Wealth Manager", version="0.1.0")
@@ -18,6 +19,7 @@ app.include_router(dashboard_router)
 app.include_router(investments_router)
 app.include_router(decisions_router)
 app.include_router(books_router)
+app.include_router(opportunities_router)
 
 
 @app.get("/health/live")

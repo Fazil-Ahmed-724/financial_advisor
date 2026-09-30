@@ -23,6 +23,9 @@ export type Dashboard = {
   investment_book_value: string;
   liability_balance: string;
   net_worth_book_value: string;
+  confirmed_property_value: string;
+  net_worth_with_confirmed_property: string;
+  property_value_basis: 'user_confirmed_only';
   monthly_essential_expenses: string;
   reserve_months: number;
   reserve_target: string;
@@ -97,3 +100,5 @@ export type DecisionDetail = Decision & {
 };
 export type Book = { id:string; title:string; author:string; edition:string|null; publication_year:number|null; topic:string; source:string; language:string; original_filename:string; media_type:string; file_size:number; checksum_sha256:string; extraction_version:number; ingestion_status:string; status_detail:string|null; created_at:string; updated_at:string };
 export type BookPassage = { id:string; book_id:string; book_title:string; author:string; reference_type:string; reference_label:string; excerpt:string; extraction_version:number; learning_support:true; market_data:false; buy_sell_instruction:false };
+export type PropertyListing = { id:string; city:'Karachi'; source_type:'user_entered'|'authorized_export'; source_name:string; canonical_url:string|null; source_id:string|null; observed_at:string; listing_status:string|null; purpose:'sale'|'rent'; property_type:string; area_name:string; area_amount:string; area_unit:string; asking_amount:string; attributes:Record<string,unknown>; information_quality:string; asking_price_status:'unverified_asking_price'; confirmed_transaction_price:false; stale:boolean; stale_after_days:number; owned_by_user:boolean; confirmed_valuation:string|null; valuation_confirmed_at:string|null; created_at:string };
+export type OpportunityAnalysis = { id:string; domain:string; analysis_type:string; source_evidence:Record<string,unknown>; assumptions:Record<string,unknown>; calculated_metrics:Record<string,unknown>; recommendation:null; limitations:string[]; analyzer_version:string; calculated_at:string; estimate_only:true; transaction_executed:false };

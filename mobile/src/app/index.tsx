@@ -96,6 +96,7 @@ export default function HomeScreen() {
       <Link href="/analysis" asChild><ActionButton title="Hypothetical sale analysis" onPress={() => {}} /></Link>
       <Link href="/decisions" asChild><ActionButton title="Investment decision journal" onPress={() => {}} /></Link>
       <Link href="/books" asChild><ActionButton title="Personal financial book library" onPress={() => {}} /></Link>
+      <Link href="/property" asChild><ActionButton title="Karachi property research" onPress={() => {}} /></Link>
       {error ? <Text style={ui.error}>{error}</Text> : null}
       {message ? <Text style={ui.success}>{message}</Text> : null}
       {dashboardLoading ? <ActivityIndicator /> : null}
@@ -106,6 +107,8 @@ export default function HomeScreen() {
           <View style={ui.card}><Text style={ui.cardTitle}>Investments · book value</Text><Text style={ui.amount}>{dashboard.investment_book_value} PKR</Text><Text style={ui.muted}>Current market value is unavailable.</Text></View>
           <View style={ui.card}><Text style={ui.cardTitle}>Liabilities</Text><Text style={ui.amount}>{dashboard.liability_balance} PKR</Text></View>
           <View style={ui.card}><Text style={ui.cardTitle}>Net worth · book value</Text><Text style={ui.amount}>{dashboard.net_worth_book_value} PKR</Text></View>
+          <View style={ui.card}><Text style={ui.cardTitle}>Confirmed owned property</Text><Text style={ui.amount}>{dashboard.confirmed_property_value} PKR</Text><Text style={ui.muted}>User-confirmed valuation only. Property remains separate from cash and investable cash.</Text></View>
+          <View style={ui.card}><Text style={ui.cardTitle}>Net worth including confirmed property</Text><Text style={ui.amount}>{dashboard.net_worth_with_confirmed_property} PKR</Text></View>
           <View style={ui.card}><Text style={ui.cardTitle}>Emergency reserve target</Text><Text style={ui.amount}>{dashboard.reserve_target} PKR</Text><Text style={ui.muted}>{dashboard.reserve_months} months × {dashboard.monthly_essential_expenses} PKR</Text></View>
           <View style={ui.card}><Text style={ui.cardTitle}>Protected emergency cash</Text><Text style={ui.amount}>{dashboard.protected_emergency_cash} PKR</Text></View>
           <View style={ui.card}><Text style={ui.cardTitle}>Investable cash</Text><Text style={ui.amount}>{dashboard.investable_cash} PKR</Text><Text style={ui.muted}>After protected reserve and ledger liabilities; never below zero.</Text></View>

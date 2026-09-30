@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user, get_session
-from app.models import Account, FinancialProfile, JournalLine, User
+from app.models import Account, FinancialProfile, JournalLine, PropertyListing, User
 from app.schemas_dashboard import (
     DashboardResponse,
     FinancialProfileResponse,
@@ -81,6 +81,12 @@ def dashboard(
         positive_cash - protected_cash - positive_liabilities,
         ZERO,
     )
+    confirmed_property = session.scalar(select(func.coalesce(func.sum(PropertyListing.confirmed_valuation), ZERO)).where(
+        PropertyListing.user_id == user.id,
+        PropertyListing.owned_by_user.is_(True),
+        PropertyListing.confirmed_valuation.is_not(None),
+        PropertyListing.valuation_confirmed_at.is_not(None),
+    ))
 
     return DashboardResponse(
         cash_balance=cash,
@@ -92,4 +98,6 @@ def dashboard(
         reserve_target=reserve_target,
         protected_emergency_cash=protected_cash,
         investable_cash=investable_cash,
+        confirmed_property_value=confirmed_property,
+        net_worth_with_confirmed_property=cash + investment - liabilities + confirmed_property,
     )

@@ -42,3 +42,6 @@ class DashboardResponse(BaseModel):
     investable_cash: Decimal
     valuation_basis: Literal["ledger_book_value"] = "ledger_book_value"
     market_values_available: Literal[False] = False
+    confirmed_property_value: Decimal = Decimal("0.00")
+    net_worth_with_confirmed_property: Decimal = Decimal("0.00")
+    property_value_basis: Literal["user_confirmed_only"] = "user_confirmed_only"
