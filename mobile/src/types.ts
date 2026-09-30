@@ -75,3 +75,23 @@ export type SaleAnalysis = {
   excluded_items: string[]; calculated_at: string; result_type: 'estimate_only';
   order_placed: false;
 };
+
+export type Decision = {
+  id: string; trade_id: string | null; sale_analysis_id: string | null;
+  decision_date: string; instrument: string; action_considered: 'BUY' | 'SELL' | 'HOLD' | 'AVOID';
+  rationale: string; goal: string; expected_holding_period: string; risk_factors: string;
+  expected_outcome: string; confidence: string | null; planned_review_date: string | null;
+  exit_conditions: string | null; created_at: string;
+};
+
+export type DecisionReview = {
+  id: string; what_happened: string; assumptions_held: string; assumptions_failed: string;
+  lessons_learned: string; outcome_snapshot: Record<string, unknown>;
+  process_snapshot: { positive_count: number; answered_count: number; explanation: string;
+    financial_outcome_used_in_score: false }; created_at: string;
+};
+
+export type DecisionDetail = Decision & {
+  outcome: Record<string, unknown>; reviews: DecisionReview[];
+  process_and_outcome_are_separate: true; informational_only: true; order_placed: false;
+};

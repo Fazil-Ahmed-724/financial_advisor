@@ -1,6 +1,6 @@
 # Personal AI Wealth Manager
 
-Phase 1, Parts 1–5: Dockerized FastAPI and PostgreSQL, Alembic migrations, authentication, a balanced PKR ledger, emergency-reserve dashboard, external investment records, FIFO cost basis, estimate-only sale analysis, and an Expo mobile client.
+Phase 1, Parts 1–6: Dockerized FastAPI and PostgreSQL, authentication, a balanced PKR ledger, reserve dashboard, external investment records, FIFO cost basis, hypothetical analysis, an investment decision journal, and an Expo mobile client.
 
 ## Initial inspection
 
@@ -55,7 +55,7 @@ docker compose run --rm api alembic check
 docker compose run --rm api alembic revision --autogenerate -m "describe change"
 ```
 
-Review every generated migration before applying it. `downgrade` can destroy data and is intentionally omitted from the normal development workflow. Revision `20260929_0001` creates users. Revision `20260929_0002` creates the ledger. Revision `20260929_0003` creates financial profiles. Revision `20260929_0004` adds external investment trades, FIFO lots and consumptions, effective-dated tax rules, and stored sale analyses.
+Review every generated migration before applying it. `downgrade` can destroy data and is intentionally omitted from the normal development workflow. Revisions `20260929_0001` through `0003` create users, the ledger, and financial profiles. Revision `20260929_0004` adds investment/FIFO records and tax assumptions. Revision `20260929_0005` adds immutable decision snapshots, append-only reviews, and audit events.
 
 The test profile uses a separate `test-db` PostgreSQL service with a temporary in-memory data directory. Its command downgrades to the empty base and upgrades to `head` before every test run. It does not connect to the development database or mount `postgres_data`.
 
@@ -188,6 +188,22 @@ Trade quantities support eight decimal places, prices four, and PKR amounts two.
 
 Hypothetical analysis does not consume lots or change ledger balances. Gross profit/loss is gross proceeds minus FIFO cost. Net profit/loss also subtracts entered fees and configured estimated tax. No Pakistani rate is supplied by the application. With no applicable rule, `estimated_tax` is `null` and status is `not_configured`. A configured rate applies only to a positive estimate after fees; a loss produces zero estimated tax and never assumes a credit or refund. Any user-entered loss-treatment note is shown separately. Each result stores FIFO allocations, assumptions, exclusions, calculation time, `estimate_only`, and `order_placed: false`.
 
+## Decision journal and compliance records
+
+Decision records preserve the original rationale and cannot be edited. A record may link to one owned external trade or hypothetical analysis. Later reflection is appended through separate review records.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST`, `GET` | `/decisions` | Create immutable reasoning snapshots or list them |
+| `GET` | `/decisions/{id}` | View original thesis, measured outcome, and review history |
+| `POST` | `/decisions/{id}/reviews` | Append a post-decision review and checklist snapshot |
+| `GET` | `/audit-events` | List the user's append-only audit history |
+| `POST` | `/compliance-reports` | Generate an idempotent, user-scoped JSON export |
+
+Closed positions report FIFO realized results, fees, applicable user-configured tax estimates, net estimates, and the exact tax-rule IDs/effective dates used. Missing tax configuration remains unavailable rather than zero. Open positions are labeled unrealized, with unrealized profit/loss unavailable because no market price exists. Incomplete histories are labeled unavailable.
+
+The five-item review checklist covers pre-trade thesis, risk review, concentration, recorded limits, and adherence to plan. Its explainable count includes only answered process questions. Financial profit or loss never changes that process count and does not label a decision good or bad. Reports are informational records, not official tax determinations. Dividends are explicitly marked unsupported because the ledger does not yet record them.
+
 ```powershell
 # Follow logs (Ctrl+C stops following, not the services)
 docker compose logs --follow --tail 100 api db
@@ -241,7 +257,7 @@ For a phone, use `ipconfig` to find the PC's active Wi-Fi/Ethernet IPv4 address.
 
 If you change `API_PORT`, update the mobile URL too. After changing the mobile environment, fully reload the app; restarting with `npx.cmd expo start --clear` also clears Metro's cache. An Expo tunnel exposes Metro, not this backend. These HTTP URLs are for local Expo Go development; standalone release builds need a separately configured HTTPS backend.
 
-The mobile app uses Expo Router and offers registration/login, the book-value dashboard, reserve settings, ledger entry, completed external-trade recording, FIFO holdings/lots, and hypothetical sale analysis. The trade screen explicitly states that it records a transaction executed elsewhere; the analysis screen states that it places no order. Returning to the dashboard or holdings refreshes API values. The access token is encrypted with Expo SecureStore and restricted to the current device where supported. Native device behavior still needs a manual emulator/phone smoke test.
+The mobile app uses Expo Router and offers registration/login, the book-value dashboard, reserve settings, ledger entry, external-trade recording, FIFO holdings/lots, hypothetical analysis, and decision list/detail/review screens. The original thesis and financial outcome are displayed separately, and all investment screens state that the app places no orders. The access token is encrypted with Expo SecureStore. Native behavior still needs an emulator or physical-phone smoke test.
 
 ## Checks
 
@@ -256,7 +272,7 @@ docker compose exec api python -c "from app.database import check_database; chec
 Invoke-RestMethod http://localhost:8000/health/ready
 ```
 
-Backend tests cover all earlier behavior plus multi-lot and partial FIFO consumption, purchase/sale fees, gains/losses, insufficient holdings, precision, ownership, idempotency, rollback, dashboard consistency, non-mutating analyses, configured/unconfigured tax, loss handling, and absence of broker-order routes. Tests mutate only the isolated temporary test database.
+Backend tests cover all earlier behavior plus decision ownership/linking, immutable rationale, append-only reviews and audits, realized/open/unavailable outcomes, fee/tax breakdowns, tax-rule version use, process/outcome separation, scoped exports, and absence of broker-order routes. Tests mutate only the isolated temporary test database.
 
 ```powershell
 Set-Location mobile
@@ -268,8 +284,8 @@ npx.cmd expo-doctor
 
 ## Remaining work
 
-See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), [Part 3](docs/part-3-report.md), [Part 4](docs/part-4-report.md), and [Part 5](docs/part-5-report.md) verification reports.
+See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), [Part 3](docs/part-3-report.md), [Part 4](docs/part-4-report.md), [Part 5](docs/part-5-report.md), and [Part 6](docs/part-6-report.md) verification reports.
 
-Part 5 is complete. Parts 6–8 cover multi-device alerts, the authorized book library, and integration/release checks. Expo push credentials, notification testing on real phones, user-provided book files, and OCR decisions belong to those later parts.
+Part 6 is complete. Later work covers the authorized book library and integration/release checks. Push notifications from the original roadmap have not been implemented in this revised Part 6. Expo credentials, physical-device testing, user-provided books, and OCR decisions remain future work.
 
 References: [Compose startup and health checks](https://docs.docker.com/compose/how-tos/startup-order/), [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/), and [Expo environment variables](https://docs.expo.dev/guides/environment-variables/).

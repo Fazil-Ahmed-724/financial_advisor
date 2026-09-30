@@ -94,6 +94,7 @@ export default function HomeScreen() {
       <Link href="/trade" asChild><ActionButton title="Record completed external trade" onPress={() => {}} /></Link>
       <Link href="/holdings" asChild><ActionButton title="Holdings and FIFO lots" onPress={() => {}} /></Link>
       <Link href="/analysis" asChild><ActionButton title="Hypothetical sale analysis" onPress={() => {}} /></Link>
+      <Link href="/decisions" asChild><ActionButton title="Investment decision journal" onPress={() => {}} /></Link>
       {error ? <Text style={ui.error}>{error}</Text> : null}
       {message ? <Text style={ui.success}>{message}</Text> : null}
       {dashboardLoading ? <ActivityIndicator /> : null}

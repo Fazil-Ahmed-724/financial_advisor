@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user, get_session
 from app.models import (
-    Account, InvestmentLot, InvestmentTrade, JournalEntry, JournalLine,
+    Account, AuditEvent, InvestmentLot, InvestmentTrade, JournalEntry, JournalLine,
     LotConsumption, SaleAnalysis, TaxRule, User,
 )
 from app.routes_finance import existing_idempotency, request_hash, save_idempotency
@@ -203,6 +203,11 @@ def create_tax_rule(payload: TaxRuleCreate,
     if cached is not None: return cached
     rule = TaxRule(user_id=user.id, **payload.model_dump())
     session.add(rule); session.flush(); session.refresh(rule)
+    session.add(AuditEvent(user_id=user.id, event_type="tax_rule_created",
+        entity_type="tax_rule", entity_id=rule.id,
+        details={"effective_from": rule.effective_from.isoformat(),
+                 "effective_to": None if rule.effective_to is None else rule.effective_to.isoformat(),
+                 "gain_tax_rate": str(rule.gain_tax_rate), "append_only": True}))
     body = TaxRuleResponse.model_validate(rule).model_dump(mode="json")
     save_idempotency(session, user.id, idempotency_key, operation, digest, body); session.commit()
     return body

@@ -298,3 +298,59 @@ class SaleAnalysis(Base):
     fifo_allocations: Mapped[list] = mapped_column(JSON)
     excluded_items: Mapped[list] = mapped_column(JSON)
     calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class InvestmentDecision(Base):
+    __tablename__ = "investment_decisions"
+    __table_args__ = (
+        CheckConstraint("action_considered IN ('BUY', 'SELL', 'HOLD', 'AVOID')", name="ck_investment_decisions_action"),
+        CheckConstraint("confidence IS NULL OR (confidence >= 0 AND confidence <= 100)", name="ck_investment_decisions_confidence"),
+        CheckConstraint("NOT (trade_id IS NOT NULL AND sale_analysis_id IS NOT NULL)", name="ck_investment_decisions_one_link"),
+        ForeignKeyConstraint(["trade_id", "user_id"], ["investment_trades.id", "investment_trades.user_id"], ondelete="RESTRICT", name="fk_investment_decisions_trade_owner"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    trade_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    sale_analysis_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("sale_analyses.id", ondelete="RESTRICT"), nullable=True)
+    decision_date: Mapped[date] = mapped_column(nullable=False)
+    instrument: Mapped[str] = mapped_column(String(20))
+    action_considered: Mapped[str] = mapped_column(String(10))
+    rationale: Mapped[str] = mapped_column(String(4000))
+    goal: Mapped[str] = mapped_column(String(1000))
+    expected_holding_period: Mapped[str] = mapped_column(String(500))
+    risk_factors: Mapped[str] = mapped_column(String(2000))
+    expected_outcome: Mapped[str] = mapped_column(String(1000))
+    confidence: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    planned_review_date: Mapped[date | None] = mapped_column(nullable=True)
+    exit_conditions: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class DecisionReview(Base):
+    __tablename__ = "decision_reviews"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    decision_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("investment_decisions.id", ondelete="CASCADE"), index=True)
+    what_happened: Mapped[str] = mapped_column(String(4000))
+    assumptions_held: Mapped[str] = mapped_column(String(2000))
+    assumptions_failed: Mapped[str] = mapped_column(String(2000))
+    lessons_learned: Mapped[str] = mapped_column(String(4000))
+    thesis_written_before_trade: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    risks_considered: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    concentration_considered: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    within_recorded_limits: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    followed_original_plan: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    outcome_snapshot: Mapped[dict] = mapped_column(JSON)
+    process_snapshot: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AuditEvent(Base):
+    __tablename__ = "audit_events"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    event_type: Mapped[str] = mapped_column(String(60), index=True)
+    entity_type: Mapped[str] = mapped_column(String(60))
+    entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    details: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
