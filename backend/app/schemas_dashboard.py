@@ -45,3 +45,6 @@ class DashboardResponse(BaseModel):
     confirmed_property_value: Decimal = Decimal("0.00")
     net_worth_with_confirmed_property: Decimal = Decimal("0.00")
     property_value_basis: Literal["user_confirmed_only"] = "user_confirmed_only"
+    confirmed_resale_inventory_value: Decimal = Decimal("0.00")
+    net_worth_with_confirmed_assets: Decimal = Decimal("0.00")
+    inventory_value_basis: Literal["user_confirmed_only"] = "user_confirmed_only"

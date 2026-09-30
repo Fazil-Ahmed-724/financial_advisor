@@ -484,3 +484,73 @@ class PropertyAnalysis(Base):
     annual_tax_assumption: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
     gross_yield_percent: Mapped[Decimal | None] = mapped_column(Numeric(9, 4), nullable=True)
     net_yield_percent: Mapped[Decimal | None] = mapped_column(Numeric(9, 4), nullable=True)
+
+
+class MarketplaceListing(Base):
+    __tablename__ = "marketplace_listings"
+    __table_args__ = (
+        CheckConstraint("source_platform IN ('Daraz','Temu','SHEIN','Other')", name="ck_marketplace_listings_platform"),
+        CheckConstraint("source_price > 0", name="ck_marketplace_listings_price"),
+        UniqueConstraint("id", "user_id", name="uq_marketplace_listings_id_user_id"),
+        Index("uq_marketplace_listings_user_url", "user_id", "canonical_url", unique=True, postgresql_where=text("canonical_url IS NOT NULL")),
+        Index("uq_marketplace_listings_user_source_id", "user_id", "source_platform", "source_listing_id", unique=True, postgresql_where=text("source_listing_id IS NOT NULL")),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    source_method: Mapped[str] = mapped_column(String(30))
+    source_platform: Mapped[str] = mapped_column(String(30), index=True)
+    product_name: Mapped[str] = mapped_column(String(300))
+    sku: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    source_listing_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    canonical_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    currency: Mapped[str] = mapped_column(String(3))
+    source_price: Mapped[Decimal] = mapped_column(Numeric(18, 4))
+    attributes: Mapped[dict] = mapped_column(JSON)
+    evidence: Mapped[dict] = mapped_column(JSON)
+    expected_karachi_selling_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    local_sales_channel: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    information_quality: Mapped[str] = mapped_column(String(30))
+    confirmed_inventory_value: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    inventory_valued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class MarketplaceAnalysis(Base):
+    __tablename__ = "marketplace_analyses"
+    __table_args__ = (ForeignKeyConstraint(["listing_id", "user_id"], ["marketplace_listings.id", "marketplace_listings.user_id"], ondelete="RESTRICT", name="fk_marketplace_analyses_listing_owner"),)
+    analysis_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("opportunity_analyses.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    listing_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(18, 4))
+    landed_cost_per_unit: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+    break_even_per_unit: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+    gross_margin_per_unit: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+    net_margin_per_unit: Mapped[Decimal | None] = mapped_column(Numeric(18, 4), nullable=True)
+    inventory_cash_roi_percent: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
+
+
+class MarketplaceOutcome(Base):
+    __tablename__ = "marketplace_outcomes"
+    __table_args__ = (
+        CheckConstraint("purchased_quantity >= 0 AND sold_quantity >= 0 AND returned_quantity >= 0 AND remaining_quantity >= 0", name="ck_marketplace_outcomes_quantities"),
+        UniqueConstraint("id", "user_id", name="uq_marketplace_outcomes_id_user_id"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    analysis_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("marketplace_analyses.analysis_id", ondelete="RESTRICT"), index=True)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    purchased_quantity: Mapped[Decimal] = mapped_column(Numeric(18, 4))
+    actual_purchase_cost: Mapped[Decimal] = mapped_column(Numeric(18, 2))
+    actual_other_costs: Mapped[Decimal] = mapped_column(Numeric(18, 2))
+    sold_quantity: Mapped[Decimal] = mapped_column(Numeric(18, 4))
+    actual_sales_revenue: Mapped[Decimal] = mapped_column(Numeric(18, 2))
+    actual_sales_fees: Mapped[Decimal] = mapped_column(Numeric(18, 2))
+    returned_quantity: Mapped[Decimal] = mapped_column(Numeric(18, 4))
+    return_costs: Mapped[Decimal] = mapped_column(Numeric(18, 2))
+    remaining_quantity: Mapped[Decimal] = mapped_column(Numeric(18, 4))
+    notes: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    actual_net_result: Mapped[Decimal] = mapped_column(Numeric(18, 2))
+    forecast_error: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    assumption_differences: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

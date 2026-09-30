@@ -26,6 +26,9 @@ export type Dashboard = {
   confirmed_property_value: string;
   net_worth_with_confirmed_property: string;
   property_value_basis: 'user_confirmed_only';
+  confirmed_resale_inventory_value: string;
+  net_worth_with_confirmed_assets: string;
+  inventory_value_basis: 'user_confirmed_only';
   monthly_essential_expenses: string;
   reserve_months: number;
   reserve_target: string;
@@ -102,3 +105,5 @@ export type Book = { id:string; title:string; author:string; edition:string|null
 export type BookPassage = { id:string; book_id:string; book_title:string; author:string; reference_type:string; reference_label:string; excerpt:string; extraction_version:number; learning_support:true; market_data:false; buy_sell_instruction:false };
 export type PropertyListing = { id:string; city:'Karachi'; source_type:'user_entered'|'authorized_export'; source_name:string; canonical_url:string|null; source_id:string|null; observed_at:string; listing_status:string|null; purpose:'sale'|'rent'; property_type:string; area_name:string; area_amount:string; area_unit:string; asking_amount:string; attributes:Record<string,unknown>; information_quality:string; asking_price_status:'unverified_asking_price'; confirmed_transaction_price:false; stale:boolean; stale_after_days:number; owned_by_user:boolean; confirmed_valuation:string|null; valuation_confirmed_at:string|null; created_at:string };
 export type OpportunityAnalysis = { id:string; domain:string; analysis_type:string; source_evidence:Record<string,unknown>; assumptions:Record<string,unknown>; calculated_metrics:Record<string,unknown>; recommendation:null; limitations:string[]; analyzer_version:string; calculated_at:string; estimate_only:true; transaction_executed:false };
+export type MarketplaceListing = { id:string; source_method:'user_entered'|'authorized_export'|'permitted_api'; source_platform:'Daraz'|'Temu'|'SHEIN'|'Other'; product_name:string; sku:string|null; source_listing_id:string|null; canonical_url:string|null; observed_at:string; currency:string; source_price:string; attributes:Record<string,unknown>; evidence:Record<string,unknown>; expected_karachi_selling_price:string|null; local_sales_channel:string|null; information_quality:string; stale:boolean; stale_after_days:number; source_data_status:'user_or_authorized_unverified'; purchase_executed:false; marketplace_listing_created:false; confirmed_inventory_value:string|null; inventory_valued_at:string|null; created_at:string };
+export type MarketplaceOutcome = { id:string; analysis_id:string; recorded_at:string; purchased_quantity:string; actual_purchase_cost:string; actual_other_costs:string; sold_quantity:string; actual_sales_revenue:string; actual_sales_fees:string; returned_quantity:string; return_costs:string; remaining_quantity:string; notes:string|null; actual_net_result:string; forecast_error:string|null; assumption_differences:Record<string,unknown>; created_at:string; external_transactions_only:true; success_label:'not_assigned' };

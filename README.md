@@ -1,6 +1,6 @@
 # Personal AI Wealth Manager
 
-Phase 1, Parts 1–7: Dockerized FastAPI and PostgreSQL, authentication, a balanced PKR ledger, investment records, a decision journal, a private cited financial-book library, and an Expo mobile client.
+Phase 1, Parts 1–9: Dockerized FastAPI and PostgreSQL, authentication, a balanced PKR ledger, investment records, decision and book-learning tools, property and marketplace research, and an Expo mobile client.
 
 ## Initial inspection
 
@@ -281,10 +281,32 @@ Property research does not change ledger cash, investment book value, emergency 
 Apply and verify the migration in PowerShell:
 
 ```powershell
-docker compose run --rm migrate
+docker compose run --rm api alembic upgrade head
 docker compose exec api alembic current
 docker compose exec api alembic check
 ```
+
+## Marketplace product research and resale outcomes
+
+The `marketplace_resale` domain accepts user-entered data, authorized exports, or documented permitted API data. Supported platform labels are Daraz, Temu, SHEIN, and Other. URLs are stored for provenance and deduplication and are never fetched. Source observations remain separate from local selling assumptions, estimates, and actual outside-app outcomes.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST`, `GET` | `/marketplace/listings` | Record or list product-source observations |
+| `POST` | `/opportunities/analyze/marketplace_resale/margin` | Store an immutable cost and margin estimate |
+| `GET` | `/marketplace/analyses` | List saved estimates for outcome selection |
+| `POST`, `GET` | `/marketplace/outcomes` | Record or list outside-app purchases and sales |
+
+Writes require `Idempotency-Key`. Observations over 60 days old are stale. Cross-currency calculations require a dated rate and source. Every cost category must be supplied explicitly, including zero when it does not apply. Missing required inputs make the metrics unavailable.
+
+- `landed cost = source price × exchange rate + shipping + customs + conversion fee`
+- `break-even = landed cost + selling/payment fees + packaging + delivery + other costs + returns/damage/unsold allowances`
+- `gross margin = expected selling price - landed cost`
+- `net margin = expected selling price - break-even`
+- `net margin % = net margin / expected selling price × 100`
+- `inventory cash ROI = net margin / break-even × 100`
+
+Outcomes retain the original estimate and report actual net result, forecast error, and assumption differences without assigning a success label. Inventory does not change ledger cash, investments, reserves, or investable cash. Confirmed inventory valuation appears only in separate dashboard fields; cash movement requires a separate balanced finance entry. The app provides no demand rank, rates, predictions, purchasing, listing, advertising, fulfilment, or payment execution.
 
 ## Personal financial book library
 
@@ -326,8 +348,8 @@ npx.cmd expo-doctor
 
 ## Remaining work
 
-See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), [Part 3](docs/part-3-report.md), [Part 4](docs/part-4-report.md), [Part 5](docs/part-5-report.md), [Part 6](docs/part-6-report.md), [Part 7](docs/part-7-report.md), and [Part 8](docs/part-8-report.md) verification reports.
+See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), [Part 3](docs/part-3-report.md), [Part 4](docs/part-4-report.md), [Part 5](docs/part-5-report.md), [Part 6](docs/part-6-report.md), [Part 7](docs/part-7-report.md), [Part 8](docs/part-8-report.md), and [Part 9](docs/part-9-report.md) verification reports.
 
-Part 8 is complete. Broader integration/release checks remain. Automated listing collection, confirmed transaction feeds, market data, legal/title verification, recommendations, offers, orders, and broker connectivity are not implemented.
+Part 9 is complete. Broader integration/release checks remain. Automated marketplace collection, demand data, purchasing, listing creation, advertising, fulfilment, recommendations, orders, and broker connectivity are not implemented.
 
 References: [Compose startup and health checks](https://docs.docker.com/compose/how-tos/startup-order/), [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/), and [Expo environment variables](https://docs.expo.dev/guides/environment-variables/).

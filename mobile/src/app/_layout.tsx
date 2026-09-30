@@ -19,6 +19,8 @@ export default function RootLayout() {
           <Stack.Screen name="decision/[id]" options={{ title: 'Decision review' }} />
           <Stack.Screen name="books" options={{ title: 'Financial book library' }} />
           <Stack.Screen name="property" options={{ title: 'Karachi property research' }} />
+          <Stack.Screen name="marketplace" options={{ title: 'Marketplace research' }} />
+          <Stack.Screen name="inventory" options={{ title: 'Resale outcomes' }} />
         </Stack>
         <StatusBar style="dark" />
       </AuthProvider>

@@ -35,7 +35,7 @@ def test_registry_unknown_domain_and_no_execution_or_scraping_routes():
     headers = auth("registry")
     domains = client.get("/opportunities/domains", headers=headers)
     assert domains.status_code == 200
-    assert domains.json()["registered_domains"] == ["karachi_real_estate"]
+    assert domains.json()["registered_domains"] == ["karachi_real_estate", "marketplace_resale"]
     assert analyze(headers, "comparables", {}, domain="unknown").status_code == 404
     paths = app.openapi()["paths"]
     assert not any(any(term in path for term in ("scrape", "crawl", "offer", "order", "broker")) for path in paths)

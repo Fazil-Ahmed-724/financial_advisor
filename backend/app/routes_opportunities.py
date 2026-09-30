@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.auth import get_current_user, get_session
-from app.models import OpportunityAnalysis, PropertyAnalysis, PropertyListing, User
+from app.models import MarketplaceAnalysis, OpportunityAnalysis, PropertyAnalysis, PropertyListing, User
 from app.opportunity_registry import AnalysisContext, registry
 from app.routes_finance import existing_idempotency, request_hash, save_idempotency
 from app.schemas_opportunities import AnalysisResponse, PropertyFilters, PropertyListingCreate, PropertyListingResponse, YieldInput
@@ -61,7 +61,7 @@ def exact_json(value):
     return jsonable_encoder(value, custom_encoder={Decimal: lambda amount: format(amount, "f")})
 
 @router.get("/domains")
-def domains(user:User=Depends(get_current_user)):return {"registered_domains":registry.domains(),"future_domain_example":"marketplace_resale_not_implemented"}
+def domains(user:User=Depends(get_current_user)):return {"registered_domains":registry.domains()}
 @router.post("/karachi-real-estate/listings",response_model=PropertyListingResponse,status_code=201)
 def create_listing(payload:PropertyListingCreate,idempotency_key:str=Header(min_length=1,max_length=200,alias="Idempotency-Key"),user:User=Depends(get_current_user),session:Session=Depends(get_session)):
     operation="POST /opportunities/karachi-real-estate/listings";digest=request_hash(payload);cached=existing_idempotency(session,user.id,idempotency_key,operation,digest)
@@ -94,4 +94,6 @@ def analyze(domain:str,analysis_type:str,payload:dict,idempotency_key:str=Header
         result=analyzer.analyze(AnalysisContext(session,user.id),payload)
     except ValidationError as exc:
         raise HTTPException(422, exact_json(exc.errors())) from None
-    now=datetime.now(timezone.utc);base=OpportunityAnalysis(user_id=user.id,domain=domain,source=result["source"],source_reference=result["source_reference"],observed_at=now,input_snapshot=exact_json(payload),source_evidence=exact_json(result["evidence"]),assumptions=exact_json(result["assumptions"]),calculated_metrics=exact_json(result["metrics"]),recommendation=result["recommendation"],limitations=result["limitations"],analyzer_version=analyzer.version);session.add(base);session.flush();typed=result["typed"];session.add(PropertyAnalysis(analysis_id=base.id,user_id=user.id,**typed));session.flush();body=AnalysisResponse(id=base.id,domain=domain,analysis_type=analysis_type,source_evidence=base.source_evidence,assumptions=base.assumptions,calculated_metrics=base.calculated_metrics,recommendation=base.recommendation,limitations=base.limitations,analyzer_version=base.analyzer_version,calculated_at=base.calculated_at).model_dump(mode="json");save_idempotency(session,user.id,idempotency_key,operation,digest,body);session.commit();return body
+    now=datetime.now(timezone.utc);base=OpportunityAnalysis(user_id=user.id,domain=domain,source=result["source"],source_reference=result["source_reference"],observed_at=now,input_snapshot=exact_json(payload),source_evidence=exact_json(result["evidence"]),assumptions=exact_json(result["assumptions"]),calculated_metrics=exact_json(result["metrics"]),recommendation=result["recommendation"],limitations=result["limitations"],analyzer_version=analyzer.version);session.add(base);session.flush();typed=result["typed"]
+    kind=typed.pop("kind","property")
+    session.add(MarketplaceAnalysis(analysis_id=base.id,user_id=user.id,**typed) if kind=="marketplace" else PropertyAnalysis(analysis_id=base.id,user_id=user.id,**typed));session.flush();body=AnalysisResponse(id=base.id,domain=domain,analysis_type=analysis_type,source_evidence=base.source_evidence,assumptions=base.assumptions,calculated_metrics=base.calculated_metrics,recommendation=base.recommendation,limitations=base.limitations,analyzer_version=base.analyzer_version,calculated_at=base.calculated_at).model_dump(mode="json");save_idempotency(session,user.id,idempotency_key,operation,digest,body);session.commit();return body
