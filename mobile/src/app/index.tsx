@@ -99,6 +99,10 @@ export default function HomeScreen() {
       <Link href="/property" asChild><ActionButton title="Karachi property research" onPress={() => {}} /></Link>
       <Link href="/marketplace" asChild><ActionButton title="Marketplace product research" onPress={() => {}} /></Link>
       <Link href="/inventory" asChild><ActionButton title="Resale inventory and outcomes" onPress={() => {}} /></Link>
+      <Link href="/rankings" asChild><ActionButton title="Karachi marketplace rankings" onPress={() => {}} /></Link>
+      <Link href="/product-compare" asChild><ActionButton title="Compare marketplace products" onPress={() => {}} /></Link>
+      <Link href="/watchlist" asChild><ActionButton title="Marketplace watchlist" onPress={() => {}} /></Link>
+      <Link href="/marketplace-import" asChild><ActionButton title="Import marketplace evidence" onPress={() => {}} /></Link>
       {error ? <Text style={ui.error}>{error}</Text> : null}
       {message ? <Text style={ui.success}>{message}</Text> : null}
       {dashboardLoading ? <ActivityIndicator /> : null}

@@ -1,6 +1,6 @@
 # Personal AI Wealth Manager
 
-Phase 1, Parts 1–9: Dockerized FastAPI and PostgreSQL, authentication, a balanced PKR ledger, investment records, decision and book-learning tools, property and marketplace research, and an Expo mobile client.
+Phase 1, Parts 1–11: Dockerized FastAPI and PostgreSQL, authentication, a balanced PKR ledger, investment records, decision and book-learning tools, property research, reviewed Karachi marketplace intelligence imports, and an Expo mobile client.
 
 ## Initial inspection
 
@@ -310,6 +310,44 @@ Outcomes retain the original estimate and report actual net result, forecast err
 
 ## Personal financial book library
 
+## Karachi marketplace intelligence
+
+Part 10 adds a normalized, historical intelligence layer at `/api/v1/marketplace`. The sole active market is Pakistan / Sindh / Karachi / PKR (`Asia/Karachi`). Products remain user owned. Observations, Karachi sourcing options, competition signals, rankings, and watchlists preserve source classification, reference, observation date, and evidence. No URL is fetched by the server.
+
+Deterministic matching normalizes case, whitespace, punctuation, common unit spacing, brand, model text, and saved aliases. It returns `exact_match`, `probable_match`, `ambiguous`, or `unmatched`. CSV/JSON imports always pass through parse, validation, mapping, preview, duplicate review, explicit row actions, and atomic commit. Imported rankings and margins are ignored; the application recalculates them from accepted evidence. Explicit merge and split operations retain aliases, move selected evidence, archive merged sources, and create audit events. Observations and ranking snapshots remain historical.
+
+Freshness policy is centralized: marketplace price and competition evidence are fresh through 7 days and aging through 14; demand and sourcing evidence are fresh through 14 days and aging through 28. Older records are stale. Research readiness reports identity completeness, recent price, sourcing, competition, demand, margin, unresolved matches, stale evidence, warnings, and missing fields. File size, row count, and batch-ranking limits use `MARKETPLACE_IMPORT_MAX_BYTES`, `MARKETPLACE_IMPORT_MAX_ROWS`, and `MARKETPLACE_BATCH_RANK_MAX`.
+
+Research Score weights are demand 25%, margin 25%, competition 15%, sourcing 15%, logistics 10%, and evidence confidence 10%. Margin reads the saved Part 9 calculation. Missing components remain unavailable, are listed in the explanation, and reduce confidence. Each snapshot includes component reasons, weights, missing inputs, and limitations. A Research Score is not a success prediction or guarantee.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/v1/marketplace/market` | Read the active Karachi market context |
+| `POST`, `GET` | `/api/v1/marketplace/products` | Create normalized products or filter/sort research |
+| `GET` | `/api/v1/marketplace/products/{id}` | Read full product intelligence |
+| `POST`, `GET` | `/api/v1/marketplace/products/{id}/observations` | Append/view marketplace and demand history |
+| `POST`, `GET` | `/api/v1/marketplace/products/{id}/sourcing` | Add/view Karachi sourcing evidence |
+| `POST`, `GET` | `/api/v1/marketplace/products/{id}/competition` | Add/view competition evidence |
+| `POST` | `/api/v1/marketplace/products/{id}/rank` | Store an explainable ranking snapshot |
+| `GET` | `/api/v1/marketplace/rankings` | Review ranking history |
+| `POST` | `/api/v1/marketplace/compare` | Compare two to four products |
+| `GET`, `POST` | `/api/v1/marketplace/watchlist` | List/add watchlist entries |
+| `PUT`, `DELETE` | `/api/v1/marketplace/watchlist/{id}` | Update/remove an owned entry |
+| `POST`, `GET` | `/api/v1/marketplace/imports` | Upload CSV/JSON evidence or list import batches |
+| `GET` | `/api/v1/marketplace/imports/{id}/preview` | Review normalized rows, validation, and proposed matches |
+| `POST` | `/api/v1/marketplace/imports/{id}/mapping` | Replace the column mapping and revalidate |
+| `PUT` | `/api/v1/marketplace/imports/{id}/rows/{row_id}` | Choose create, attach, skip, or review for a row |
+| `POST` | `/api/v1/marketplace/imports/{id}/commit` | Commit every resolved row atomically |
+| `POST` | `/api/v1/marketplace/products/merge` | Merge two owned products and preserve an audit snapshot |
+| `POST` | `/api/v1/marketplace/products/{id}/split` | Split selected evidence into a new owned product |
+| `GET` | `/api/v1/marketplace/products/{id}/history` | Read chronological identity, evidence, merge/split, ranking, and watchlist events |
+| `GET` | `/api/v1/marketplace/products/{id}/data-quality` | Read freshness, completeness, warnings, and research readiness |
+| `GET`, `POST` | `/api/v1/marketplace/research-presets` | List/create saved filter and sorting presets |
+| `PUT`, `DELETE` | `/api/v1/marketplace/research-presets/{id}` | Update/delete an owned preset |
+| `POST` | `/api/v1/marketplace/research-presets/{id}/run` | Run a validated preset |
+| `POST` | `/api/v1/marketplace/rankings/batch` | Recalculate bounded product batches with per-item results |
+| `GET` | `/api/v1/marketplace/exports/{kind}?format=csv|json` | Export owned products, rankings, watchlist, or observations |
+
 Authenticated users can upload owned or authorized `.txt`, `.epub`, and text-based `.pdf` files through `POST /books`. Files are stored under UUID keys in the private Docker `book_data` volume and are never served by public URLs. The default limit is 20 MiB (`BOOK_MAX_UPLOAD_BYTES`). Metadata can be listed, viewed, patched, reprocessed, or deleted with `/books` routes; deletion removes database passages and the private source file.
 
 Extraction preserves TXT section, EPUB chapter-file, and PDF page references. Image-only PDFs are marked `ocr_required`; OCR is not implemented. Source SHA-256 and extraction version prevent duplicate passages during unchanged reprocessing. `GET /book-search?q=...` uses an indexed PostgreSQL full-text vector and returns short cited excerpts. No LLM, embedding service, generated answer, unauthorized downloader, market-data inference, or buy/sell instruction is included.
@@ -348,8 +386,8 @@ npx.cmd expo-doctor
 
 ## Remaining work
 
-See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), [Part 3](docs/part-3-report.md), [Part 4](docs/part-4-report.md), [Part 5](docs/part-5-report.md), [Part 6](docs/part-6-report.md), [Part 7](docs/part-7-report.md), [Part 8](docs/part-8-report.md), and [Part 9](docs/part-9-report.md) verification reports.
+See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), [Part 3](docs/part-3-report.md), [Part 4](docs/part-4-report.md), [Part 5](docs/part-5-report.md), [Part 6](docs/part-6-report.md), [Part 7](docs/part-7-report.md), [Part 8](docs/part-8-report.md), [Part 9](docs/part-9-report.md), [Part 10](docs/part-10-report.md), and [Part 11](docs/part-11-report.md) verification reports.
 
-Part 9 is complete. Broader integration/release checks remain. Automated marketplace collection, demand data, purchasing, listing creation, advertising, fulfilment, recommendations, orders, and broker connectivity are not implemented.
+Part 11 is complete. Data remains user supplied, an authorized export, or a permitted API result. Marketplace collection, background polling, purchasing, listing creation, advertising, fulfilment, autonomous decisions, and broker connectivity are not implemented.
 
 References: [Compose startup and health checks](https://docs.docker.com/compose/how-tos/startup-order/), [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/), and [Expo environment variables](https://docs.expo.dev/guides/environment-variables/).

@@ -21,6 +21,12 @@ export default function RootLayout() {
           <Stack.Screen name="property" options={{ title: 'Karachi property research' }} />
           <Stack.Screen name="marketplace" options={{ title: 'Marketplace research' }} />
           <Stack.Screen name="inventory" options={{ title: 'Resale outcomes' }} />
+          <Stack.Screen name="rankings" options={{ title: 'Marketplace Rankings' }} />
+          <Stack.Screen name="product/[id]" options={{ title: 'Product Intelligence' }} />
+          <Stack.Screen name="product-compare" options={{ title: 'Product Comparison' }} />
+          <Stack.Screen name="watchlist" options={{ title: 'Product Watchlist' }} />
+          <Stack.Screen name="marketplace-import" options={{ title: 'Import marketplace evidence' }} />
+          <Stack.Screen name="match-review" options={{ title: 'Review imported matches' }} />
         </Stack>
         <StatusBar style="dark" />
       </AuthProvider>

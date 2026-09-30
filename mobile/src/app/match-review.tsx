@@ -1,0 +1,15 @@
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { Text, View } from 'react-native';
+import { ApiError, apiRequest } from '@/api';
+import { useAuth } from '@/auth';
+import { ActionButton, Screen, ui } from '@/components';
+import { MarketplaceImportPreview, MarketplaceImportRow } from '@/types';
+
+export default function MatchReview(){
+  const {batchId}=useLocalSearchParams<{batchId:string}>(); const {token}=useAuth(); const [preview,setPreview]=useState<MarketplaceImportPreview|null>(null); const [error,setError]=useState(''); const [message,setMessage]=useState('');
+  const load=useCallback(async()=>{if(!token||!batchId)return;try{setPreview(await apiRequest(`/api/v1/marketplace/imports/${batchId}/preview`,{},token));setError('');}catch(e){setError(e instanceof ApiError?e.message:'Could not load preview.');}},[batchId,token]); useFocusEffect(useCallback(()=>{void load();},[load]));
+  async function choose(row:MarketplaceImportRow,action:MarketplaceImportRow['action']){if(!token)return;try{await apiRequest(`/api/v1/marketplace/imports/${batchId}/rows/${row.id}`,{method:'PUT',body:JSON.stringify({action,proposed_product_id:action==='attach_to_existing_product'?row.proposed_product_id:null})},token);await load();}catch(e){setError(e instanceof ApiError?e.message:'Could not update row.');}}
+  async function commit(){if(!token)return;try{const b=await apiRequest<{committed_rows:number}>(`/api/v1/marketplace/imports/${batchId}/commit`,{method:'POST'},token);setMessage(`Committed ${b.committed_rows} reviewed rows atomically.`);await load();}catch(e){setError(e instanceof ApiError?e.message:'Commit failed.');}}
+  return <Screen><Text style={ui.title}>Import preview and match review</Text><Text style={ui.subtitle}>Resolve invalid, probable, or ambiguous rows explicitly. Commit writes the reviewed batch in one transaction.</Text>{error?<Text style={ui.error}>{error}</Text>:null}{message?<Text style={ui.success}>{message}</Text>:null}{!preview?<Text style={ui.muted}>Loading preview…</Text>:preview.rows.map(r=><View style={ui.card} key={r.id}><Text style={ui.cardTitle}>Row {r.row_number} · {r.validation_status}</Text><Text>Match: {r.duplicate_status} · action: {r.action}</Text><Text>{String(r.normalized_data.observed_name??'Unnamed row')}</Text>{r.errors.map(x=><Text style={ui.error} key={x}>{x}</Text>)}{r.warnings.map(x=><Text style={ui.muted} key={x}>{x}</Text>)}<View style={ui.row}>{r.proposed_product_id?<ActionButton title="Attach proposed match" onPress={()=>void choose(r,'attach_to_existing_product')}/>:null}<ActionButton title="Create product" onPress={()=>void choose(r,'create_product')} disabled={r.validation_status==='invalid'}/><ActionButton title="Skip row" onPress={()=>void choose(r,'skip')}/></View></View>)}{preview&&preview.batch.status!=='committed'&&preview.batch.status!=='cancelled'?<ActionButton title="Commit reviewed batch" onPress={()=>void commit()}/>:null}</Screen>;
+}
