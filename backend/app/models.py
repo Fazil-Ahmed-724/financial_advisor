@@ -9,12 +9,13 @@ from sqlalchemy import (
     ForeignKey,
     ForeignKeyConstraint,
     JSON,
+    Index,
     Numeric,
     String,
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -353,4 +354,61 @@ class AuditEvent(Base):
     entity_type: Mapped[str] = mapped_column(String(60))
     entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     details: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Book(Base):
+    __tablename__ = "books"
+    __table_args__ = (UniqueConstraint("id", "user_id", name="uq_books_id_user_id"),)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(500))
+    author: Mapped[str] = mapped_column(String(300))
+    edition: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    publication_year: Mapped[int | None] = mapped_column(nullable=True)
+    topic: Mapped[str] = mapped_column(String(200))
+    source: Mapped[str] = mapped_column(String(500))
+    language: Mapped[str] = mapped_column(String(20), default="en")
+    original_filename: Mapped[str] = mapped_column(String(255))
+    media_type: Mapped[str] = mapped_column(String(100))
+    storage_key: Mapped[str] = mapped_column(String(100), unique=True)
+    file_size: Mapped[int] = mapped_column()
+    checksum_sha256: Mapped[str] = mapped_column(String(64))
+    extraction_version: Mapped[int] = mapped_column(default=1)
+    ingestion_status: Mapped[str] = mapped_column(String(40))
+    status_detail: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class BookPassage(Base):
+    __tablename__ = "book_passages"
+    __table_args__ = (
+        ForeignKeyConstraint(["book_id", "user_id"], ["books.id", "books.user_id"], ondelete="CASCADE", name="fk_book_passages_owner"),
+        UniqueConstraint("book_id", "extraction_version", "sequence", name="uq_book_passages_version_sequence"),
+        UniqueConstraint("id", "user_id", name="uq_book_passages_id_user_id"),
+        Index("ix_book_passages_search_vector", "search_vector", postgresql_using="gin"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    book_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    extraction_version: Mapped[int] = mapped_column()
+    sequence: Mapped[int] = mapped_column()
+    reference_type: Mapped[str] = mapped_column(String(20))
+    reference_label: Mapped[str] = mapped_column(String(300))
+    content: Mapped[str] = mapped_column(String(4000))
+    search_vector: Mapped[str] = mapped_column(TSVECTOR)
+
+
+class DecisionPassage(Base):
+    __tablename__ = "decision_passages"
+    __table_args__ = (
+        ForeignKeyConstraint(["passage_id", "user_id"], ["book_passages.id", "book_passages.user_id"], ondelete="CASCADE", name="fk_decision_passages_passage_owner"),
+        UniqueConstraint("decision_id", "passage_id", name="uq_decision_passages_link"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    decision_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("investment_decisions.id", ondelete="CASCADE"), index=True)
+    passage_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    note: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -35,10 +35,11 @@ def test_initial_migration_builds_schema_from_clean_database():
         revision = connection.execute(
             text("SELECT version_num FROM alembic_version")
         ).scalar_one()
-    assert revision == "20260929_0005"
+    assert revision == "20260930_0006"
     assert "financial_profiles" in inspector.get_table_names()
     assert {
         "investment_trades", "investment_lots", "lot_consumptions",
         "tax_rules", "sale_analyses",
     } <= set(inspector.get_table_names())
     assert {"investment_decisions", "decision_reviews", "audit_events"} <= set(inspector.get_table_names())
+    assert {"books", "book_passages", "decision_passages"} <= set(inspector.get_table_names())

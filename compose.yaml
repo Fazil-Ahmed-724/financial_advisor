@@ -30,6 +30,10 @@ services:
       APP_ENV: ${APP_ENV:-development}
       AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env}
       ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-15}
+      BOOK_STORAGE_ROOT: /data/books
+      BOOK_MAX_UPLOAD_BYTES: ${BOOK_MAX_UPLOAD_BYTES:-20971520}
+    volumes:
+      - book_data:/data/books
     ports:
       - "${API_BIND_HOST:-127.0.0.1}:${API_PORT:-8000}:8000"
     depends_on:
@@ -74,6 +78,10 @@ services:
       APP_ENV: test
       AUTH_SECRET: test_auth_secret_which_is_long_enough_1234567890abcdef
       ACCESS_TOKEN_MINUTES: "15"
+      BOOK_STORAGE_ROOT: /data/books
+      BOOK_MAX_UPLOAD_BYTES: "20971520"
+    tmpfs:
+      - /data/books
     depends_on:
       test-db:
         condition: service_healthy
@@ -81,3 +89,4 @@ services:
 
 volumes:
   postgres_data:
+  book_data:

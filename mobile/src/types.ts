@@ -95,3 +95,5 @@ export type DecisionDetail = Decision & {
   outcome: Record<string, unknown>; reviews: DecisionReview[];
   process_and_outcome_are_separate: true; informational_only: true; order_placed: false;
 };
+export type Book = { id:string; title:string; author:string; edition:string|null; publication_year:number|null; topic:string; source:string; language:string; original_filename:string; media_type:string; file_size:number; checksum_sha256:string; extraction_version:number; ingestion_status:string; status_detail:string|null; created_at:string; updated_at:string };
+export type BookPassage = { id:string; book_id:string; book_title:string; author:string; reference_type:string; reference_label:string; excerpt:string; extraction_version:number; learning_support:true; market_data:false; buy_sell_instruction:false };

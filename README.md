@@ -1,6 +1,6 @@
 # Personal AI Wealth Manager
 
-Phase 1, Parts 1–6: Dockerized FastAPI and PostgreSQL, authentication, a balanced PKR ledger, reserve dashboard, external investment records, FIFO cost basis, hypothetical analysis, an investment decision journal, and an Expo mobile client.
+Phase 1, Parts 1–7: Dockerized FastAPI and PostgreSQL, authentication, a balanced PKR ledger, investment records, a decision journal, a private cited financial-book library, and an Expo mobile client.
 
 ## Initial inspection
 
@@ -261,6 +261,23 @@ The mobile app uses Expo Router and offers registration/login, the book-value da
 
 ## Checks
 
+## Personal financial book library
+
+Authenticated users can upload owned or authorized `.txt`, `.epub`, and text-based `.pdf` files through `POST /books`. Files are stored under UUID keys in the private Docker `book_data` volume and are never served by public URLs. The default limit is 20 MiB (`BOOK_MAX_UPLOAD_BYTES`). Metadata can be listed, viewed, patched, reprocessed, or deleted with `/books` routes; deletion removes database passages and the private source file.
+
+Extraction preserves TXT section, EPUB chapter-file, and PDF page references. Image-only PDFs are marked `ocr_required`; OCR is not implemented. Source SHA-256 and extraction version prevent duplicate passages during unchanged reprocessing. `GET /book-search?q=...` uses an indexed PostgreSQL full-text vector and returns short cited excerpts. No LLM, embedding service, generated answer, unauthorized downloader, market-data inference, or buy/sell instruction is included.
+
+`POST /decisions/{decision_id}/passages/{passage_id}` attaches an owned citation as learning support. The audit event explicitly records that the link does not affect decision scoring, transaction outcomes, tax calculations, risk checks, or order execution. Back up both PostgreSQL and the `book_data` volume together; database-only backups do not contain source files.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST`, `GET` | `/books` | Upload/process or list private books |
+| `GET`, `PATCH`, `DELETE` | `/books/{id}` | View/update metadata or delete book and passages |
+| `POST` | `/books/{id}/reprocess` | Traceably re-run extraction without duplicates |
+| `GET` | `/book-search` | Search owned passages with citations |
+| `GET` | `/book-passages/{id}` | Open an owned cited result |
+
+
 From the repository root:
 
 ```powershell
@@ -284,8 +301,8 @@ npx.cmd expo-doctor
 
 ## Remaining work
 
-See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), [Part 3](docs/part-3-report.md), [Part 4](docs/part-4-report.md), [Part 5](docs/part-5-report.md), and [Part 6](docs/part-6-report.md) verification reports.
+See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), [Part 3](docs/part-3-report.md), [Part 4](docs/part-4-report.md), [Part 5](docs/part-5-report.md), [Part 6](docs/part-6-report.md), and [Part 7](docs/part-7-report.md) verification reports.
 
-Part 6 is complete. Later work covers the authorized book library and integration/release checks. Push notifications from the original roadmap have not been implemented in this revised Part 6. Expo credentials, physical-device testing, user-provided books, and OCR decisions remain future work.
+Part 7 is complete. Integration/release checks remain. OCR, market data, paid models, book downloading, and broker connectivity are not implemented.
 
 References: [Compose startup and health checks](https://docs.docker.com/compose/how-tos/startup-order/), [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/), and [Expo environment variables](https://docs.expo.dev/guides/environment-variables/).
