@@ -1,9 +1,10 @@
 import os,re
+from collections import Counter
 from datetime import datetime,timezone
 from decimal import Decimal
 from sqlalchemy import func,or_,select
 from sqlalchemy.orm import Session
-from app.assistant_provider import provider
+from app.assistant_provider import DeterministicProvider,provider
 from app.marketplace_policy import FRESHNESS
 from app.models import Account,Book,BookPassage,DecisionReview,FinancialProfile,InvestmentDecision,MarketplaceCompetitionSignal,MarketplaceProduct,MarketplaceProductObservation,MarketplaceProductRanking,MarketplaceSourcingOption,OpportunityAnalysis,PropertyListing,SaleAnalysis,TaxRule,User
 from app.routes_dashboard import ledger_totals
@@ -95,17 +96,25 @@ def validate_response(evidence,result):
     derived=sorted({f"{x['source_type']}: {x['freshness']}" for x in evidence}) or ["No evidence retrieved"]
     if parsed.freshness!=derived:raise ValueError("Freshness labels do not match source metadata")
     return parsed.model_dump()
+def validate_generated_text(generated,deterministic):
+    if Counter(re.findall(r"\[(\d+)\]",generated))!=Counter(re.findall(r"\[(\d+)\]",deterministic)):raise ValueError("Generated citation markers changed")
+    numeric=r"(?<![A-Za-z])[-+]?\d+(?:[.,]\d+)*(?:%|\b)"
+    if Counter(re.findall(numeric,generated))!=Counter(re.findall(numeric,deterministic)):raise ValueError("Generated numeric values changed")
 def answer_with_meta(session,user,question):
-    refusal=bool(ACTION_PATTERN.search(question));evidence=[] if refusal else retrieve(session,user,question);base=_draft(evidence,refusal);chosen=provider();fallback=False;validation="passed"
+    refusal=bool(ACTION_PATTERN.search(question));evidence=[] if refusal else retrieve(session,user,question);base=_draft(evidence,refusal);fallback=False;validation="passed";configured=os.environ.get("ASSISTANT_PROVIDER","disabled").strip().lower() or "disabled"
+    try:chosen=provider()
+    except Exception:chosen=DeterministicProvider();fallback=configured not in ("disabled","deterministic");validation="safe_fallback" if fallback else "passed"
     result=dict(base)
     if chosen.mode=="llm" and not refusal and evidence:
         try:
-            result["answer"]=chosen.explain(question,base["answer"],[{**c,"record_id":str(c["record_id"]),"date":c["date"].isoformat() if c["date"] else None} for c in base["citations"]]);result["mode"]="llm"
+            result["answer"]=chosen.explain(question,base["answer"],[{**c,"record_id":str(c["record_id"]),"date":c["date"].isoformat() if c["date"] else None} for c in base["citations"]]);validate_generated_text(result["answer"],base["answer"]);result["mode"]="llm"
             result=validate_response(evidence,result)
         except Exception:
             result=validate_response(evidence,base);fallback=True;validation="safe_fallback";result["limitations"].append("The configured language provider failed validation; deterministic mode was used.")
-    else:result=validate_response(evidence,result)
+    else:
+        result=validate_response(evidence,result)
+        if fallback:result["limitations"].append("The configured language provider was unavailable; deterministic mode was used.")
     outcome="refused" if refusal else "abstained" if not evidence else "success"
-    return result,{"outcome":outcome,"provider_mode":chosen.mode,"response_mode":result["mode"],"validation_status":validation,"fallback":fallback,"citation_count":len(result["citations"])}
+    return result,{"outcome":outcome,"provider_mode":getattr(chosen,"name",configured) if not fallback else configured,"response_mode":result["mode"],"validation_status":validation,"fallback":fallback,"citation_count":len(result["citations"])}
 def answer(session,user,question):
     return answer_with_meta(session,user,question)[0]

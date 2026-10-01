@@ -1,6 +1,6 @@
 # Personal AI Wealth Manager
 
-Phase 1, Parts 1–13: Dockerized FastAPI and PostgreSQL, authentication, a balanced PKR ledger, investment records, decision and book-learning tools, property and marketplace research, reviewed imports, and a cited read-only research assistant with evaluation and audit controls in the Expo client.
+Phase 1, Parts 1–14: Dockerized FastAPI and PostgreSQL, authentication, a balanced PKR ledger, investment records, decision and book-learning tools, property and marketplace research, reviewed imports, and a cited read-only research assistant with evaluation, audit controls, and optional local-model explanations.
 
 ## Initial inspection
 
@@ -392,6 +392,42 @@ The default `ASSISTANT_PROVIDER=disabled` mode performs no model or network call
 
 `ASSISTANT_PROVIDER=openai_compatible` is optional. It requires `ASSISTANT_PROVIDER_URL`, `ASSISTANT_PROVIDER_MODEL`, and `ASSISTANT_PROVIDER_API_KEY`. When enabled, the user's question and the bounded retrieved excerpts leave this application and are sent to that provider. Review the provider's privacy, retention, residency, and billing terms first. API keys belong only in the server environment and must never use an `EXPO_PUBLIC_*` variable. Provider failure or missing citation markers falls back to deterministic mode. Generated wording is not independently verified, and citations do not establish suitability.
 
+### Optional local OpenAI-compatible provider
+
+Part 14 adds `ASSISTANT_PROVIDER=local_openai_compatible`. It is disabled by default, requires no paid API, and accepts only `localhost`, loopback addresses, or Docker's `host.docker.internal` gateway. Redirects and environment HTTP proxies are disabled for local-provider calls so evidence cannot be redirected or forwarded elsewhere by this adapter. The API never installs Ollama, downloads a model, browses the network for the model, or gives the model database, shell, browsing, or write tools.
+
+Ollama is one compatible option. Install and run it separately. On Windows, its API normally uses port 11434. Select and download a model explicitly; model names, licenses, disk use, RAM/VRAM needs, speed, and quality vary:
+
+```powershell
+# Run these outside this repository after installing Ollama.
+# These user variables take effect after Ollama is restarted.
+[Environment]::SetEnvironmentVariable('OLLAMA_HOST', '0.0.0.0:11434', 'User')
+[Environment]::SetEnvironmentVariable('OLLAMA_NO_CLOUD', '1', 'User')
+
+# Explicit operator action: this downloads the chosen model. The API never runs it.
+ollama pull <model-name>
+ollama list
+```
+
+Keep Windows Firewall access limited to the local machine/trusted private network. Then set these values in the root `.env` and rebuild the API:
+
+```dotenv
+ASSISTANT_PROVIDER=local_openai_compatible
+ASSISTANT_LOCAL_PROVIDER_URL=http://host.docker.internal:11434/v1
+ASSISTANT_LOCAL_PROVIDER_MODEL=<model-name>
+ASSISTANT_PROVIDER_TIMEOUT_SECONDS=15
+ASSISTANT_PROVIDER_MAX_CONCURRENCY=2
+ASSISTANT_PROVIDER_MAX_REQUEST_BYTES=65536
+ASSISTANT_PROVIDER_MAX_RESPONSE_BYTES=32768
+```
+
+```powershell
+docker compose up --build -d --wait
+docker compose logs --tail 100 api
+```
+
+The application supplies only the bounded authorized evidence bundle and deterministic draft. It rejects changed numbers, changed citation markers, fabricated citation objects, malformed/oversized output, redirects, timeouts, and connection errors, then returns deterministic mode. Request limits may need to be reduced on machines with limited memory. Ollama notes that model storage can require tens to hundreds of GB and that parallel/context settings increase memory demand. CPU-only inference can be slow. A passing test suite does not establish model quality or financial, tax, or legal suitability. See the [Ollama Windows guide](https://docs.ollama.com/windows) and [Ollama FAQ](https://docs.ollama.com/faq).
+
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `POST`, `GET` | `/assistant/conversations` | Create or list the user's bounded conversation history |
@@ -422,8 +458,8 @@ Checked-in results are in [JSON](docs/evaluations/part-13-evaluation.json) and [
 
 ## Remaining work
 
-See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), [Part 3](docs/part-3-report.md), [Part 4](docs/part-4-report.md), [Part 5](docs/part-5-report.md), [Part 6](docs/part-6-report.md), [Part 7](docs/part-7-report.md), [Part 8](docs/part-8-report.md), [Part 9](docs/part-9-report.md), [Part 10](docs/part-10-report.md), [Part 11](docs/part-11-report.md), [Part 12](docs/part-12-report.md), and [Part 13](docs/part-13-report.md) verification reports.
+See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), [Part 3](docs/part-3-report.md), [Part 4](docs/part-4-report.md), [Part 5](docs/part-5-report.md), [Part 6](docs/part-6-report.md), [Part 7](docs/part-7-report.md), [Part 8](docs/part-8-report.md), [Part 9](docs/part-9-report.md), [Part 10](docs/part-10-report.md), [Part 11](docs/part-11-report.md), [Part 12](docs/part-12-report.md), [Part 13](docs/part-13-report.md), and [Part 14](docs/part-14-report.md) verification reports.
 
-Part 13 is complete. Assistant responses remain evidence explanations, not independently verified advice. Data remains user supplied, an authorized export, or a permitted API result. Scraping, background polling, purchasing, listing creation, property offers, advertising, fulfilment, autonomous decisions, and broker connectivity are not implemented.
+Part 14 is complete. Assistant responses remain evidence explanations, not independently verified advice. Data remains user supplied, an authorized export, or a permitted API result. Scraping, background polling, purchasing, listing creation, property offers, advertising, fulfilment, autonomous decisions, and broker connectivity are not implemented.
 
 References: [Compose startup and health checks](https://docs.docker.com/compose/how-tos/startup-order/), [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/), and [Expo environment variables](https://docs.expo.dev/guides/environment-variables/).
