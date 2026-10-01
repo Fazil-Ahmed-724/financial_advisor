@@ -35,7 +35,7 @@ def test_initial_migration_builds_schema_from_clean_database():
         revision = connection.execute(
             text("SELECT version_num FROM alembic_version")
         ).scalar_one()
-    assert revision == "20261001_0010"
+    assert revision == "20261001_0011"
     assert "financial_profiles" in inspector.get_table_names()
     assert {
         "investment_trades", "investment_lots", "lot_consumptions",
@@ -47,3 +47,4 @@ def test_initial_migration_builds_schema_from_clean_database():
     assert {"marketplace_listings", "marketplace_analyses", "marketplace_outcomes"} <= set(inspector.get_table_names())
     assert {"market_locations", "marketplace_products", "marketplace_product_observations", "marketplace_sourcing_options", "marketplace_competition_signals", "marketplace_product_rankings", "marketplace_product_watchlists"} <= set(inspector.get_table_names())
     assert {"marketplace_import_batches", "marketplace_import_rows", "marketplace_product_aliases", "marketplace_product_merge_events", "marketplace_product_split_events", "marketplace_research_presets"} <= set(inspector.get_table_names())
+    assert {"assistant_conversations", "assistant_messages"} <= set(inspector.get_table_names())

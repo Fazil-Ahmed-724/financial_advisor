@@ -603,3 +603,24 @@ class MarketplaceProductSplitEvent(Base):
 class MarketplaceResearchPreset(Base):
     __tablename__="marketplace_research_presets";__table_args__=(UniqueConstraint("user_id","name",name="uq_marketplace_research_preset_name"),)
     id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4);user_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"),index=True);name:Mapped[str]=mapped_column(String(100));market_location_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("market_locations.id",ondelete="RESTRICT"));filters:Mapped[dict]=mapped_column(JSON);sorting:Mapped[dict]=mapped_column(JSON);is_default:Mapped[bool]=mapped_column(Boolean,server_default="false");created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now());updated_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now(),onupdate=func.now())
+
+class AssistantConversation(Base):
+    __tablename__="assistant_conversations"
+    __table_args__=(UniqueConstraint("id","user_id",name="uq_assistant_conversation_owner"),)
+    id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
+    user_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"),index=True)
+    title:Mapped[str]=mapped_column(String(120))
+    created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now())
+    updated_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now(),onupdate=func.now())
+
+class AssistantMessage(Base):
+    __tablename__="assistant_messages"
+    __table_args__=(CheckConstraint("role IN ('user','assistant')",name="ck_assistant_messages_role"),ForeignKeyConstraint(["conversation_id","user_id"],["assistant_conversations.id","assistant_conversations.user_id"],ondelete="CASCADE",name="fk_assistant_messages_owner"),UniqueConstraint("conversation_id","sequence",name="uq_assistant_message_sequence"))
+    id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
+    conversation_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),index=True)
+    user_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"),index=True)
+    sequence:Mapped[int]=mapped_column()
+    role:Mapped[str]=mapped_column(String(10))
+    content:Mapped[str]=mapped_column(String(12000))
+    response_data:Mapped[dict|None]=mapped_column(JSON,nullable=True)
+    created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now())

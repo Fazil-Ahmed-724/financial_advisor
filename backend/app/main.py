@@ -13,6 +13,7 @@ from app.routes_opportunities import router as opportunities_router
 from app.routes_marketplace import router as marketplace_router
 from app.routes_intelligence import router as intelligence_router
 from app.routes_marketplace_review import router as marketplace_review_router
+from app.routes_assistant import router as assistant_router
 
 load_settings()
 app = FastAPI(title="Personal AI Wealth Manager", version="0.1.0")
@@ -26,6 +27,7 @@ app.include_router(opportunities_router)
 app.include_router(marketplace_router)
 app.include_router(intelligence_router)
 app.include_router(marketplace_review_router)
+app.include_router(assistant_router)
 
 
 @app.get("/health/live")

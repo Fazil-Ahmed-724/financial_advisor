@@ -103,6 +103,7 @@ export default function HomeScreen() {
       <Link href="/product-compare" asChild><ActionButton title="Compare marketplace products" onPress={() => {}} /></Link>
       <Link href="/watchlist" asChild><ActionButton title="Marketplace watchlist" onPress={() => {}} /></Link>
       <Link href="/marketplace-import" asChild><ActionButton title="Import marketplace evidence" onPress={() => {}} /></Link>
+      <Link href="/assistant" asChild><ActionButton title="Cited research assistant" onPress={() => {}} /></Link>
       {error ? <Text style={ui.error}>{error}</Text> : null}
       {message ? <Text style={ui.success}>{message}</Text> : null}
       {dashboardLoading ? <ActivityIndicator /> : null}

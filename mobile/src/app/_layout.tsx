@@ -27,6 +27,8 @@ export default function RootLayout() {
           <Stack.Screen name="watchlist" options={{ title: 'Product Watchlist' }} />
           <Stack.Screen name="marketplace-import" options={{ title: 'Import marketplace evidence' }} />
           <Stack.Screen name="match-review" options={{ title: 'Review imported matches' }} />
+          <Stack.Screen name="assistant" options={{ title: 'Cited research assistant' }} />
+          <Stack.Screen name="assistant-evidence" options={{ title: 'Assistant evidence and limitations' }} />
         </Stack>
         <StatusBar style="dark" />
       </AuthProvider>

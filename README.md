@@ -1,6 +1,6 @@
 # Personal AI Wealth Manager
 
-Phase 1, Parts 1–11: Dockerized FastAPI and PostgreSQL, authentication, a balanced PKR ledger, investment records, decision and book-learning tools, property research, reviewed Karachi marketplace intelligence imports, and an Expo mobile client.
+Phase 1, Parts 1–12: Dockerized FastAPI and PostgreSQL, authentication, a balanced PKR ledger, investment records, decision and book-learning tools, property and marketplace research, reviewed imports, and a cited read-only research assistant in the Expo client.
 
 ## Initial inspection
 
@@ -384,10 +384,26 @@ npx.cmd expo install --check
 npx.cmd expo-doctor
 ```
 
+## Cited read-only research assistant
+
+Part 12 adds authenticated conversations under `/assistant`. The assistant searches only the authenticated user's stored records. It uses PostgreSQL full-text search for book passages and structured, user-scoped queries for ledger totals, holdings, saved sale analyses, tax assumptions, decision/review records, property evidence and calculations, and marketplace observations and ranking snapshots. It references existing deterministic outputs and does not recalculate gains, fees, taxes, yields, margins, or scores in generated text.
+
+The default `ASSISTANT_PROVIDER=disabled` mode performs no model or network call. It returns a deterministic evidence summary with numbered citations, calculation references, freshness labels, limitations, and an explicit insufficient-evidence response. Book passages, imported files, and listing text are untrusted evidence; instructions contained in them are never treated as assistant instructions.
+
+`ASSISTANT_PROVIDER=openai_compatible` is optional. It requires `ASSISTANT_PROVIDER_URL`, `ASSISTANT_PROVIDER_MODEL`, and `ASSISTANT_PROVIDER_API_KEY`. When enabled, the user's question and the bounded retrieved excerpts leave this application and are sent to that provider. Review the provider's privacy, retention, residency, and billing terms first. API keys belong only in the server environment and must never use an `EXPO_PUBLIC_*` variable. Provider failure or missing citation markers falls back to deterministic mode. Generated wording is not independently verified, and citations do not establish suitability.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST`, `GET` | `/assistant/conversations` | Create or list the user's bounded conversation history |
+| `GET`, `DELETE` | `/assistant/conversations/{id}` | Read or permanently delete one owned conversation and its messages |
+| `POST` | `/assistant/conversations/{id}/messages` | Retrieve owned evidence and return a cited read-only answer |
+
+Questions are limited to 4,000 characters. Defaults allow 20 conversations, 50 messages per conversation, 8 retrieved records, and 12,000 evidence characters. Configure these with `ASSISTANT_MAX_CONVERSATIONS`, `ASSISTANT_MAX_MESSAGES_PER_CONVERSATION`, `ASSISTANT_RETRIEVAL_LIMIT`, and `ASSISTANT_MAX_CONTEXT_CHARS`. Only assistant conversation/message records are created or deleted; no financial or research record is mutated.
+
 ## Remaining work
 
-See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), [Part 3](docs/part-3-report.md), [Part 4](docs/part-4-report.md), [Part 5](docs/part-5-report.md), [Part 6](docs/part-6-report.md), [Part 7](docs/part-7-report.md), [Part 8](docs/part-8-report.md), [Part 9](docs/part-9-report.md), [Part 10](docs/part-10-report.md), and [Part 11](docs/part-11-report.md) verification reports.
+See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), [Part 3](docs/part-3-report.md), [Part 4](docs/part-4-report.md), [Part 5](docs/part-5-report.md), [Part 6](docs/part-6-report.md), [Part 7](docs/part-7-report.md), [Part 8](docs/part-8-report.md), [Part 9](docs/part-9-report.md), [Part 10](docs/part-10-report.md), [Part 11](docs/part-11-report.md), and [Part 12](docs/part-12-report.md) verification reports.
 
-Part 11 is complete. Data remains user supplied, an authorized export, or a permitted API result. Marketplace collection, background polling, purchasing, listing creation, advertising, fulfilment, autonomous decisions, and broker connectivity are not implemented.
+Part 12 is complete. Assistant responses remain evidence explanations, not independently verified advice. Data remains user supplied, an authorized export, or a permitted API result. Scraping, background polling, purchasing, listing creation, property offers, advertising, fulfilment, autonomous decisions, and broker connectivity are not implemented.
 
 References: [Compose startup and health checks](https://docs.docker.com/compose/how-tos/startup-order/), [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/), and [Expo environment variables](https://docs.expo.dev/guides/environment-variables/).

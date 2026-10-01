@@ -114,3 +114,7 @@ export type MarketplaceImportBatch = { id:string; import_type:string; source_cla
 export type MarketplaceImportRow = { id:string; row_number:number; raw_data:Record<string,unknown>; normalized_data:Record<string,unknown>; validation_status:'valid'|'invalid'; warnings:string[]; errors:string[]; duplicate_status:string; proposed_product_id:string|null; action:'create_product'|'attach_to_existing_product'|'skip'|'requires_review' };
 export type MarketplaceImportPreview = { batch:MarketplaceImportBatch; rows:MarketplaceImportRow[] };
 export type MarketplaceHistoryEvent = { type:string; at:string; data:Record<string,unknown> };
+export type AssistantCitation = { source_type:string; record_id:string; date:string|null; excerpt:string; record_path:string; freshness:'fresh'|'aging'|'stale'|'undated'|'estimated'|'unverified'|'user_entered' };
+export type AssistantAnswer = { answer:string; citations:AssistantCitation[]; evidence_references:Record<string,unknown>[]; freshness:string[]; limitations:string[]; mode:'deterministic'|'llm' };
+export type AssistantMessage = { id:string; role:'user'|'assistant'; content:string; created_at:string; response:AssistantAnswer|null };
+export type AssistantConversation = { id:string; title:string; created_at:string; updated_at:string; messages:AssistantMessage[] };
