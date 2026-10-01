@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import BaseModel,ConfigDict,Field,field_validator,model_validator
 
 class ConversationCreate(BaseModel):title:str|None=Field(default=None,max_length=120)
-class ChatRequest(BaseModel):message:str=Field(min_length=1,max_length=4000)
+class ChatRequest(BaseModel):message:str=Field(min_length=1,max_length=4000);notify_when_ready:bool=False
 class Citation(BaseModel):source_type:str;record_id:uuid.UUID;date:datetime|None;excerpt:str=Field(max_length=500);record_path:str;freshness:Literal["fresh","aging","stale","undated","estimated","unverified","user_entered"]
 class AssistantAnswer(BaseModel):
     model_config=ConfigDict(extra="forbid")

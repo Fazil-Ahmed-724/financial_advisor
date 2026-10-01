@@ -11,7 +11,7 @@ from app.auth import (
     verify_password,
 )
 from app.config import load_settings
-from app.models import FinancialProfile, User
+from app.models import FinancialProfile, NotificationDevice, User
 from app.schemas import Credentials, RegistrationResponse, TokenResponse, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
@@ -21,10 +21,17 @@ def normalized_email(email: str) -> str:
     return email.strip().lower()
 
 
-def token_response(user: User) -> TokenResponse:
+def token_response(user: User, session: Session, credentials: Credentials) -> TokenResponse:
     settings = load_settings()
+    device=None
+    if credentials.installation_id:
+        if not credentials.platform or not credentials.device_name:raise HTTPException(422,"Platform and device name are required with installation ID")
+        device=session.scalar(select(NotificationDevice).where(NotificationDevice.user_id==user.id,NotificationDevice.installation_id==credentials.installation_id))
+        if device and device.revoked_at:raise HTTPException(401,"Device access was revoked")
+        if not device:
+            device=NotificationDevice(user_id=user.id,installation_id=credentials.installation_id,platform=credentials.platform,display_name=" ".join(credentials.device_name.split()));session.add(device);session.commit();session.refresh(device)
     return TokenResponse(
-        access_token=create_access_token(user.id, settings=settings),
+        access_token=create_access_token(user.id, settings=settings, device=device),
         expires_in=settings.access_token_minutes * 60,
     )
 
@@ -47,7 +54,7 @@ def register(credentials: Credentials, session: Session = Depends(get_session)):
             detail="An account with this email already exists",
         ) from None
     session.refresh(user)
-    return RegistrationResponse(user=user, token=token_response(user))
+    return RegistrationResponse(user=user, token=token_response(user,session,credentials))
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -61,7 +68,7 @@ def login(credentials: Credentials, session: Session = Depends(get_session)):
             detail="Invalid email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return token_response(user)
+    return token_response(user,session,credentials)
 
 
 @router.get("/me", response_model=UserResponse)

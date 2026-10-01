@@ -1,13 +1,19 @@
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { AuthProvider } from '@/auth';
+import { AuthProvider, useAuth } from '@/auth';
+import * as Notifications from 'expo-notifications';
+import { useEffect } from 'react';
+import { notificationRoute } from '@/notification-routing';
+
+function NotificationNavigation(){const{token}=useAuth();useEffect(()=>{const open=(response:Notifications.NotificationResponse|null)=>{const route=notificationRoute(response?.notification.request.content.data,Boolean(token));if(route)router.push(route as never)};Notifications.getLastNotificationResponseAsync().then(open);const subscription=Notifications.addNotificationResponseReceivedListener(open);return()=>subscription.remove()},[token]);return null}
 
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
+        <NotificationNavigation />
         <Stack>
           <Stack.Screen name="index" options={{ title: 'Wealth Manager' }} />
           <Stack.Screen name="accounts" options={{ title: 'Accounts' }} />
@@ -30,6 +36,7 @@ export default function RootLayout() {
           <Stack.Screen name="assistant" options={{ title: 'Cited research assistant' }} />
           <Stack.Screen name="assistant-evidence" options={{ title: 'Assistant evidence and limitations' }} />
           <Stack.Screen name="assistant-feedback" options={{ title: 'Assistant feedback review' }} />
+          <Stack.Screen name="notification-settings" options={{ title: 'Notifications and devices' }} />
         </Stack>
         <StatusBar style="dark" />
       </AuthProvider>

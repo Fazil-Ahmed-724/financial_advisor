@@ -11,6 +11,7 @@ import {
 
 import { apiRequest } from '@/api';
 import { TokenResponse } from '@/types';
+import { deviceCredentials, installationId } from '@/notifications';
 
 const TOKEN_KEY = 'wealth-manager.access-token';
 
@@ -42,23 +43,26 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
+    const device=await deviceCredentials();
     const result = await apiRequest<TokenResponse>('/auth/login', {
-      method: 'POST', body: JSON.stringify({ email, password }),
+      method: 'POST', body: JSON.stringify({ email, password, ...device }),
     });
     await saveToken(result.access_token);
   }, [saveToken]);
 
   const register = useCallback(async (email: string, password: string) => {
+    const device=await deviceCredentials();
     const result = await apiRequest<{ token: TokenResponse }>('/auth/register', {
-      method: 'POST', body: JSON.stringify({ email, password }),
+      method: 'POST', body: JSON.stringify({ email, password, ...device }),
     });
     await saveToken(result.token.access_token);
   }, [saveToken]);
 
   const logout = useCallback(async () => {
+    if(token){try{const devices=await apiRequest<{id:string;installation_id:string}[]>('/notifications/devices',{},token);const currentInstallation=await installationId();const current=devices.find(x=>x.installation_id===currentInstallation);if(current)await apiRequest(`/notifications/devices/${current.id}`,{method:'DELETE'},token);}catch{/* Local logout still succeeds if revocation cannot reach the API. */}}
     await SecureStore.deleteItemAsync(TOKEN_KEY);
     setToken(null);
-  }, []);
+  }, [token]);
 
   const value = useMemo(
     () => ({ token, loading, login, register, logout }),

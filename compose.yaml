@@ -66,6 +66,35 @@ services:
     restart: unless-stopped
     command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
 
+  notification-worker:
+    build:
+      context: ./backend
+      target: runtime
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      APP_ENV: ${APP_ENV:-development}
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env}
+      ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES:-15}
+      NOTIFICATION_PROVIDER_TIMEOUT_SECONDS: ${NOTIFICATION_PROVIDER_TIMEOUT_SECONDS:-10}
+      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    command: ["python", "-m", "app.notification_worker", "loop"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
   test-db:
     profiles: ["test"]
     image: postgres:17-alpine

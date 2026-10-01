@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.assistant_service import answer_with_meta
 from app.auth import get_current_user,get_session
 from app.models import AssistantConversation,AssistantMessage,AuditEvent,User
+from app.notification_service import enqueue_event
 from app.schemas_assistant import AssistantAnswer,ChatRequest,ConversationCreate,ConversationResponse,FeedbackCreate,FeedbackExportRequest,FeedbackResponse,FeedbackUpdate,MessageResponse,MetricsResponse
 
 router=APIRouter(prefix="/assistant",tags=["read-only research assistant"])
@@ -43,7 +44,9 @@ def chat(conversation_id:uuid.UUID,payload:ChatRequest,user:User=Depends(get_cur
     try:result,meta=answer_with_meta(session,user,question)
     except Exception:
         session.rollback();latency=round((time.perf_counter()-started)*1000,2);session.add(AuditEvent(user_id=user.id,event_type="assistant_request",entity_type="assistant_conversation",entity_id=conversation_id,details={"outcome":"failed","provider_mode":"unknown","response_mode":"none","latency_ms":latency,"citation_count":0,"validation_status":"failed","fallback":True}));session.commit();raise HTTPException(503,"Assistant response failed safely") from None
-    assistant=AssistantMessage(conversation_id=conversation.id,user_id=user.id,sequence=count+2,role="assistant",content=result["answer"],response_data=jsonable_encoder(result));conversation.updated_at=datetime.now(timezone.utc);session.add(assistant);session.flush();meta["latency_ms"]=round((time.perf_counter()-started)*1000,2);session.add(AuditEvent(user_id=user.id,event_type="assistant_request",entity_type="assistant_message",entity_id=assistant.id,details=meta));session.commit();session.refresh(assistant);return message_body(assistant)
+    assistant=AssistantMessage(conversation_id=conversation.id,user_id=user.id,sequence=count+2,role="assistant",content=result["answer"],response_data=jsonable_encoder(result));conversation.updated_at=datetime.now(timezone.utc);session.add(assistant);session.flush();meta["latency_ms"]=round((time.perf_counter()-started)*1000,2);session.add(AuditEvent(user_id=user.id,event_type="assistant_request",entity_type="assistant_message",entity_id=assistant.id,details=meta))
+    if payload.notify_when_ready:enqueue_event(session,user.id,"assistant_response_ready",str(assistant.id),f"/assistant?conversationId={conversation.id}")
+    session.commit();session.refresh(assistant);return message_body(assistant)
 @router.post("/messages/{message_id}/feedback",status_code=201)
 def feedback(message_id:uuid.UUID,payload:FeedbackCreate,user:User=Depends(get_current_user),session:Session=Depends(get_session)):
     message=session.scalar(select(AssistantMessage).where(AssistantMessage.id==message_id,AssistantMessage.user_id==user.id,AssistantMessage.role=="assistant").with_for_update())
@@ -79,10 +82,12 @@ def feedback_export(payload:FeedbackExportRequest,user:User=Depends(get_current_
     return {"format_version":"assistant-feedback-regression-v1","sanitized":True,"confirmed":True,"automatic_training":False,"automatic_prompt_or_provider_change":False,"requires_manual_test_implementation":True,"cases":cases}
 @router.put("/feedback/{feedback_id}",response_model=FeedbackResponse)
 def feedback_update(feedback_id:uuid.UUID,payload:FeedbackUpdate,user:User=Depends(get_current_user),session:Session=Depends(get_session)):
-    event=feedback_owned(session,user.id,feedback_id);details=dict(event.details);changes=payload.model_dump(exclude_unset=True);effective_status=changes.get("status",details.get("status","submitted"))
+    event=feedback_owned(session,user.id,feedback_id);details=dict(event.details);previous_status=details.get("status","submitted");changes=payload.model_dump(exclude_unset=True);effective_status=changes.get("status",previous_status)
     if changes.get("fixture_selected") is True and effective_status!="reviewed":raise HTTPException(422,"Review the report before selecting it for fixture export")
     if effective_status!="reviewed":changes["fixture_selected"]=False
-    details.update(changes);details["updated_at"]=datetime.now(timezone.utc).isoformat();details["contains_prompt_or_answer"]=False;details["contains_source_text"]=False;details["financial_action"]=False;event.details=details;session.commit();session.refresh(event);return feedback_body(event)
+    details.update(changes);details["updated_at"]=datetime.now(timezone.utc).isoformat();details["contains_prompt_or_answer"]=False;details["contains_source_text"]=False;details["financial_action"]=False;event.details=details
+    if effective_status!=previous_status and effective_status in ("reviewed","dismissed"):enqueue_event(session,user.id,"feedback_review_status_changed",f"{event.id}:{effective_status}","/assistant-feedback")
+    session.commit();session.refresh(event);return feedback_body(event)
 @router.delete("/feedback/{feedback_id}",status_code=204)
 def feedback_delete(feedback_id:uuid.UUID,user:User=Depends(get_current_user),session:Session=Depends(get_session)):
     event=feedback_owned(session,user.id,feedback_id);session.delete(event);session.commit()

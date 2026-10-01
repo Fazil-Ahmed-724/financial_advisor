@@ -624,3 +624,41 @@ class AssistantMessage(Base):
     content:Mapped[str]=mapped_column(String(12000))
     response_data:Mapped[dict|None]=mapped_column(JSON,nullable=True)
     created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now())
+
+NOTIFICATION_EVENT_TYPES=("reminder_due","assistant_response_ready","feedback_review_status_changed")
+
+class NotificationDevice(Base):
+    __tablename__="notification_devices"
+    __table_args__=(UniqueConstraint("user_id","installation_id",name="uq_notification_device_installation"),UniqueConstraint("expo_push_token",name="uq_notification_device_push_token"),CheckConstraint("platform IN ('android','ios')",name="ck_notification_device_platform"),CheckConstraint("push_status IN ('unregistered','active','disabled','invalid','revoked')",name="ck_notification_device_status"),UniqueConstraint("id","user_id",name="uq_notification_device_owner"))
+    id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
+    user_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"),index=True)
+    installation_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True))
+    platform:Mapped[str]=mapped_column(String(10));display_name:Mapped[str]=mapped_column(String(80))
+    expo_push_token:Mapped[str|None]=mapped_column(String(300),nullable=True)
+    push_status:Mapped[str]=mapped_column(String(20),server_default="unregistered")
+    notifications_enabled:Mapped[bool]=mapped_column(Boolean,server_default="false")
+    session_version:Mapped[int]=mapped_column(server_default="1")
+    last_seen_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now())
+    revoked_at:Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True)
+    created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now())
+    updated_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now(),onupdate=func.now())
+
+class NotificationPreference(Base):
+    __tablename__="notification_preferences"
+    __table_args__=(CheckConstraint("event_type IN ('reminder_due','assistant_response_ready','feedback_review_status_changed')",name="ck_notification_preference_event"),UniqueConstraint("user_id","event_type",name="uq_notification_user_preference"))
+    id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4);user_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"),index=True);event_type:Mapped[str]=mapped_column(String(50));enabled:Mapped[bool]=mapped_column(Boolean,server_default="false");updated_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now(),onupdate=func.now())
+
+class DeviceNotificationPreference(Base):
+    __tablename__="device_notification_preferences"
+    __table_args__=(CheckConstraint("event_type IN ('reminder_due','assistant_response_ready','feedback_review_status_changed')",name="ck_device_notification_preference_event"),ForeignKeyConstraint(["device_id","user_id"],["notification_devices.id","notification_devices.user_id"],ondelete="CASCADE",name="fk_device_notification_preference_owner"),UniqueConstraint("device_id","event_type",name="uq_device_notification_preference"))
+    id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4);user_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"),index=True);device_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),index=True);event_type:Mapped[str]=mapped_column(String(50));enabled:Mapped[bool]=mapped_column(Boolean,server_default="false");updated_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now(),onupdate=func.now())
+
+class NotificationEvent(Base):
+    __tablename__="notification_events"
+    __table_args__=(CheckConstraint("event_type IN ('reminder_due','assistant_response_ready','feedback_review_status_changed')",name="ck_notification_event_type"),UniqueConstraint("user_id","event_type","dedupe_key",name="uq_notification_event_dedupe"),UniqueConstraint("id","user_id",name="uq_notification_event_owner"))
+    id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4);user_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"),index=True);event_type:Mapped[str]=mapped_column(String(50));dedupe_key:Mapped[str]=mapped_column(String(120));deep_link:Mapped[str]=mapped_column(String(200));created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now())
+
+class NotificationDelivery(Base):
+    __tablename__="notification_deliveries"
+    __table_args__=(ForeignKeyConstraint(["event_id","user_id"],["notification_events.id","notification_events.user_id"],ondelete="CASCADE",name="fk_notification_delivery_event_owner"),ForeignKeyConstraint(["device_id","user_id"],["notification_devices.id","notification_devices.user_id"],ondelete="CASCADE",name="fk_notification_delivery_device_owner"),UniqueConstraint("event_id","device_id",name="uq_notification_delivery_fanout"),CheckConstraint("status IN ('pending','retry','accepted','delivered','permanent_failure','dead_letter','unknown')",name="ck_notification_delivery_status"))
+    id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4);user_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"),index=True);event_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),index=True);device_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),index=True);status:Mapped[str]=mapped_column(String(30),server_default="pending",index=True);attempt_count:Mapped[int]=mapped_column(server_default="0");next_attempt_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now(),index=True);expo_ticket_id:Mapped[str|None]=mapped_column(String(100),nullable=True,index=True);last_error_code:Mapped[str|None]=mapped_column(String(60),nullable=True);accepted_at:Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True);receipt_checked_at:Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True);acknowledged_at:Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True);created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now());updated_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now(),onupdate=func.now())

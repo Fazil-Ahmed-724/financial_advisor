@@ -1,6 +1,6 @@
 # Personal AI Wealth Manager
 
-Phase 1, Parts 1–15: Dockerized FastAPI and PostgreSQL, authentication, a balanced PKR ledger, investment records, decision and book-learning tools, property and marketplace research, reviewed imports, and a cited read-only research assistant with evaluation, audit controls, optional local-model explanations, and supervised personal feedback review.
+Phase 1, Parts 1–16: Dockerized FastAPI and PostgreSQL, authentication, a balanced PKR ledger, investment records, decision and book-learning tools, property and marketplace research, reviewed imports, a cited read-only research assistant, and opt-in multi-device informational notifications.
 
 ## Initial inspection
 
@@ -471,6 +471,37 @@ A report must be marked `reviewed`, explicitly selected for fixture export, incl
 
 See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), [Part 3](docs/part-3-report.md), [Part 4](docs/part-4-report.md), [Part 5](docs/part-5-report.md), [Part 6](docs/part-6-report.md), [Part 7](docs/part-7-report.md), [Part 8](docs/part-8-report.md), [Part 9](docs/part-9-report.md), [Part 10](docs/part-10-report.md), [Part 11](docs/part-11-report.md), [Part 12](docs/part-12-report.md), [Part 13](docs/part-13-report.md), [Part 14](docs/part-14-report.md), and [Part 15](docs/part-15-report.md) verification reports.
 
-Part 15 is complete. Assistant responses remain evidence explanations, not independently verified advice. Feedback has no automatic learning or action effect. Data remains user supplied, an authorized export, or a permitted API result. Scraping, background polling, purchasing, listing creation, property offers, advertising, fulfilment, autonomous decisions, and broker connectivity are not implemented.
+## Opt-in multi-device notifications
+
+Part 16 adds informational notifications through a transactional PostgreSQL outbox and a separate `notification-worker` Compose service. Every preference defaults off. A device must register a valid Expo token, enable notifications, and opt in both at user and device level before it is eligible for fanout.
+
+Supported event types are limited to `reminder_due`, explicitly requested `assistant_response_ready`, and `feedback_review_status_changed`. Push payloads contain fixed generic text, an event ID/type, and an allowlisted in-app path. They never contain balances, holdings, tax data, book passages, marketplace/property content, prompts, assistant answers, or transaction instructions.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST`, `GET` | `/notifications/devices` | Register/rotate the current token or list owned devices |
+| `PUT`, `DELETE` | `/notifications/devices/{id}` | Enable/disable or revoke a device and device-bound session |
+| `GET`, `PUT` | `/notifications/preferences` | Read/update user or per-device event opt-ins |
+| `POST` | `/notifications/reminders` | Idempotently enqueue an informational reminder |
+| `GET` | `/notifications/history` | View per-device delivery and dead-letter states |
+| `POST` | `/notifications/history/{id}/acknowledge` | Mark an owned in-app history item acknowledged |
+
+The outbox uniquely identifies each event and device delivery. The worker sends only after the creating database transaction commits. It records pending, retry, accepted, delivered-to-provider, permanent-failure, dead-letter, and unknown states; retries transient failures at most four times with exponential backoff; polls Expo receipts after 15 minutes; and deactivates `DeviceNotRegistered` tokens. Expo ticket acceptance means Expo accepted the request, and a successful receipt means APNs/FCM accepted it. Neither state proves the phone displayed the notification.
+
+Mobile login/register requests include a locally generated installation ID so that device revocation invalidates that device-bound JWT. Logout attempts server revocation before removing the encrypted local access token. Older API clients that omit device metadata continue to receive ordinary short-lived user tokens.
+
+Remote push requires a physical device and an Expo development/production build; Expo Go does not support remote push for this SDK. Configure `EXPO_PUBLIC_EAS_PROJECT_ID` in `mobile/.env`, set up Android FCM v1 and/or Apple push credentials through EAS, then use the Notifications screen to request permission and register. The optional server-side `EXPO_ACCESS_TOKEN` supports Expo enhanced push security and must remain only in the root `.env`.
+
+Worker operations:
+
+```powershell
+docker compose up --build -d --wait
+docker compose logs --follow --tail 100 notification-worker
+# One-off recovery/diagnostic passes:
+docker compose exec notification-worker python -m app.notification_worker send
+docker compose exec notification-worker python -m app.notification_worker receipts
+```
+
+Part 16 is complete. Notifications remain informational and cannot place orders, make offers or purchases, mutate financial records, or turn assistant output into executable instructions. Market polling, price alerts, inferred urgency, and external market-data collection are not implemented.
 
 References: [Compose startup and health checks](https://docs.docker.com/compose/how-tos/startup-order/), [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/), and [Expo environment variables](https://docs.expo.dev/guides/environment-variables/).
