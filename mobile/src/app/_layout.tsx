@@ -29,6 +29,7 @@ export default function RootLayout() {
           <Stack.Screen name="match-review" options={{ title: 'Review imported matches' }} />
           <Stack.Screen name="assistant" options={{ title: 'Cited research assistant' }} />
           <Stack.Screen name="assistant-evidence" options={{ title: 'Assistant evidence and limitations' }} />
+          <Stack.Screen name="assistant-feedback" options={{ title: 'Assistant feedback review' }} />
         </Stack>
         <StatusBar style="dark" />
       </AuthProvider>

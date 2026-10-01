@@ -118,3 +118,6 @@ export type AssistantCitation = { source_type:string; record_id:string; date:str
 export type AssistantAnswer = { answer:string; citations:AssistantCitation[]; evidence_references:Record<string,unknown>[]; freshness:string[]; limitations:string[]; mode:'deterministic'|'llm' };
 export type AssistantMessage = { id:string; role:'user'|'assistant'; content:string; created_at:string; response:AssistantAnswer|null };
 export type AssistantConversation = { id:string; title:string; created_at:string; updated_at:string; messages:AssistantMessage[] };
+export type AssistantFeedbackCategory = 'helpful'|'inaccurate'|'unsupported'|'stale'|'confusing'|'missing_evidence';
+export type AssistantFeedback = { id:string; message_id:string; category:AssistantFeedbackCategory; comment:string|null; status:'submitted'|'reviewed'|'dismissed'; review_note:string|null; fixture_selected:boolean; response_mode:'deterministic'|'llm'|'unknown'; citation_ids:string[]; source_dates:string[]; freshness:string[]; evaluation_metadata:Record<string,unknown>; created_at:string; updated_at:string; financial_action:false };
+export type FeedbackFixtureExport = { format_version:'assistant-feedback-regression-v1'; sanitized:true; confirmed:true; automatic_training:false; automatic_prompt_or_provider_change:false; requires_manual_test_implementation:true; cases:Record<string,unknown>[] };

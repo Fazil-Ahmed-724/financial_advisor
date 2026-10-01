@@ -1,6 +1,6 @@
 # Personal AI Wealth Manager
 
-Phase 1, Parts 1–14: Dockerized FastAPI and PostgreSQL, authentication, a balanced PKR ledger, investment records, decision and book-learning tools, property and marketplace research, reviewed imports, and a cited read-only research assistant with evaluation, audit controls, and optional local-model explanations.
+Phase 1, Parts 1–15: Dockerized FastAPI and PostgreSQL, authentication, a balanced PKR ledger, investment records, decision and book-learning tools, property and marketplace research, reviewed imports, and a cited read-only research assistant with evaluation, audit controls, optional local-model explanations, and supervised personal feedback review.
 
 ## Initial inspection
 
@@ -434,6 +434,9 @@ The application supplies only the bounded authorized evidence bundle and determi
 | `GET`, `DELETE` | `/assistant/conversations/{id}` | Read or permanently delete one owned conversation and its messages |
 | `POST` | `/assistant/conversations/{id}/messages` | Retrieve owned evidence and return a cited read-only answer |
 | `POST` | `/assistant/messages/{id}/feedback` | Record a privacy-minimized quality report; creates no financial action |
+| `GET` | `/assistant/feedback` | List the authenticated user's private feedback inbox |
+| `PUT`, `DELETE` | `/assistant/feedback/{id}` | Review/update or delete one owned report |
+| `POST` | `/assistant/feedback/export` | Export explicitly selected reviewed reports as sanitized fixture candidates |
 | `GET` | `/assistant/metrics` | Return the user's aggregate request, fallback, citation, and latency metrics |
 
 Questions are limited to 4,000 characters. Defaults allow 20 conversations, 50 messages per conversation, 8 retrieved records, and 12,000 evidence characters. Configure these with `ASSISTANT_MAX_CONVERSATIONS`, `ASSISTANT_MAX_MESSAGES_PER_CONVERSATION`, `ASSISTANT_RETRIEVAL_LIMIT`, and `ASSISTANT_MAX_CONTEXT_CHARS`. Only assistant conversation/message records are created or deleted; no financial or research record is mutated.
@@ -456,10 +459,18 @@ docker compose --profile test run --build --rm `
 
 Checked-in results are in [JSON](docs/evaluations/part-13-evaluation.json) and [Markdown](docs/evaluations/part-13-evaluation.md). The evaluation measures citations, ownership, abstention, stale/conflicting evidence labels, exact deterministic calculation agreement, read-only state boundaries, cross-user isolation, and prompt-injection handling. Passing is a regression signal; it does not prove advice suitability, universal correctness, or regulatory compliance. Part 13 needs no schema change, so Alembic remains at `20261001_0011`.
 
+## Supervised response feedback
+
+Part 15 extends the existing Part 13 feedback endpoint. Each owned assistant response can have one report in a fixed category: `helpful`, `inaccurate`, `unsupported`, `stale`, `confusing`, or `missing_evidence`. An optional user note is limited to 500 characters. A duplicate submission returns HTTP 409; use the report's update endpoint to change its category, note, personal review annotation, or status.
+
+The application has no administrator or reviewer role. `/assistant/feedback` is therefore a private personal review inbox with `submitted`, `reviewed`, and `dismissed` states. It retains response mode, citation record IDs, source dates, freshness labels, calculation-service names, and validation/fallback metadata. It does not duplicate prompts, answers, citation excerpts, financial values, or provider secrets. Deleting feedback deletes its feedback event only; it does not delete or change the assistant conversation or any financial/research record.
+
+A report must be marked `reviewed`, explicitly selected for fixture export, included by ID in the export request, and confirmed with `confirm_sanitized_export: true`. The exported `assistant-feedback-regression-v1` document strips user/message/record IDs, prompts, answers, account data, balances, raw passages, user notes, annotations, and secrets. Export creates a candidate for manual regression-test implementation; it does not modify the checked-in evaluation dataset, train a model, fine-tune anything, alter prompts, or change provider settings.
+
 ## Remaining work
 
-See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), [Part 3](docs/part-3-report.md), [Part 4](docs/part-4-report.md), [Part 5](docs/part-5-report.md), [Part 6](docs/part-6-report.md), [Part 7](docs/part-7-report.md), [Part 8](docs/part-8-report.md), [Part 9](docs/part-9-report.md), [Part 10](docs/part-10-report.md), [Part 11](docs/part-11-report.md), [Part 12](docs/part-12-report.md), [Part 13](docs/part-13-report.md), and [Part 14](docs/part-14-report.md) verification reports.
+See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), [Part 3](docs/part-3-report.md), [Part 4](docs/part-4-report.md), [Part 5](docs/part-5-report.md), [Part 6](docs/part-6-report.md), [Part 7](docs/part-7-report.md), [Part 8](docs/part-8-report.md), [Part 9](docs/part-9-report.md), [Part 10](docs/part-10-report.md), [Part 11](docs/part-11-report.md), [Part 12](docs/part-12-report.md), [Part 13](docs/part-13-report.md), [Part 14](docs/part-14-report.md), and [Part 15](docs/part-15-report.md) verification reports.
 
-Part 14 is complete. Assistant responses remain evidence explanations, not independently verified advice. Data remains user supplied, an authorized export, or a permitted API result. Scraping, background polling, purchasing, listing creation, property offers, advertising, fulfilment, autonomous decisions, and broker connectivity are not implemented.
+Part 15 is complete. Assistant responses remain evidence explanations, not independently verified advice. Feedback has no automatic learning or action effect. Data remains user supplied, an authorized export, or a permitted API result. Scraping, background polling, purchasing, listing creation, property offers, advertising, fulfilment, autonomous decisions, and broker connectivity are not implemented.
 
 References: [Compose startup and health checks](https://docs.docker.com/compose/how-tos/startup-order/), [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/), and [Expo environment variables](https://docs.expo.dev/guides/environment-variables/).
