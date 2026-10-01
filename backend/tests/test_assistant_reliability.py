@@ -20,9 +20,9 @@ def test_versioned_evaluation_dataset_and_offline_runner(tmp_path):
     assert report["provider"]=="disabled" and report["network_access"] is False
     assert report["failed_cases"]==0 and report["passed_cases"]==report["total_cases"]
     assert (tmp_path/"report.json").exists() and "Part 13 assistant evaluation" in markdown
-    for metric in ("citation_coverage","citation_ownership","abstained","stale_labeled","conflict_labeled","calculation_agreement","read_only_refusal","cross_user_blocked","injection_ignored"):assert metric in report["metrics"]
+    for metric in ("citation_coverage","citation_ownership","abstained","stale_labeled","conflict_labeled","calculation_agreement","read_only_refusal","read_only_boundary","cross_user_blocked","injection_ignored"):assert metric in report["metrics"]
 
-def test_malformed_provider_output_falls_back_and_metrics_are_private(monkeypatch):
+def test_malformed_provider_output_falls_back_and_metrics_are_private(monkeypatch,caplog):
     class BadProvider:
         mode="llm"
         def explain(self,*args):return "Fabricated answer without required citation markers"
@@ -33,6 +33,7 @@ def test_malformed_provider_output_falls_back_and_metrics_are_private(monkeypatc
     metrics=client.get("/assistant/metrics",headers=headers).json();assert metrics["total_requests"]==1 and metrics["fallbacks"]==1
     with SessionLocal() as session:event=session.scalar(select(AuditEvent).where(AuditEvent.user_id==uid,AuditEvent.event_type=="assistant_request"));serialized=json.dumps(event.details)
     assert secret not in serialized and "cash balance" not in serialized and set(event.details)=={"outcome","provider_mode","response_mode","validation_status","fallback","citation_count","latency_ms"}
+    assert secret not in caplog.text and "PRIVATE-PROMPT" not in caplog.text
 
 def test_fabricated_citation_and_calculation_are_rejected():
     rid=uuid.uuid4();evidence=[{"source_type":"book_passage","record_id":rid,"date":None,"excerpt":"Owned excerpt","record_path":"/books/x","freshness":"undated","calculation":None}]

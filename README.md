@@ -1,6 +1,6 @@
 # Personal AI Wealth Manager
 
-Phase 1, Parts 1–12: Dockerized FastAPI and PostgreSQL, authentication, a balanced PKR ledger, investment records, decision and book-learning tools, property and marketplace research, reviewed imports, and a cited read-only research assistant in the Expo client.
+Phase 1, Parts 1–13: Dockerized FastAPI and PostgreSQL, authentication, a balanced PKR ledger, investment records, decision and book-learning tools, property and marketplace research, reviewed imports, and a cited read-only research assistant with evaluation and audit controls in the Expo client.
 
 ## Initial inspection
 
@@ -397,13 +397,33 @@ The default `ASSISTANT_PROVIDER=disabled` mode performs no model or network call
 | `POST`, `GET` | `/assistant/conversations` | Create or list the user's bounded conversation history |
 | `GET`, `DELETE` | `/assistant/conversations/{id}` | Read or permanently delete one owned conversation and its messages |
 | `POST` | `/assistant/conversations/{id}/messages` | Retrieve owned evidence and return a cited read-only answer |
+| `POST` | `/assistant/messages/{id}/feedback` | Record a privacy-minimized quality report; creates no financial action |
+| `GET` | `/assistant/metrics` | Return the user's aggregate request, fallback, citation, and latency metrics |
 
 Questions are limited to 4,000 characters. Defaults allow 20 conversations, 50 messages per conversation, 8 retrieved records, and 12,000 evidence characters. Configure these with `ASSISTANT_MAX_CONVERSATIONS`, `ASSISTANT_MAX_MESSAGES_PER_CONVERSATION`, `ASSISTANT_RETRIEVAL_LIMIT`, and `ASSISTANT_MAX_CONTEXT_CHARS`. Only assistant conversation/message records are created or deleted; no financial or research record is mutated.
 
+## Assistant evaluation and reliability
+
+Part 13 validates every provider response against the bounded response schema and the exact user-authorized retrieval set before it is returned. Fabricated or altered citations, calculation references that differ from stored deterministic outputs, malformed provider data, missing citation markers, and oversized output trigger a deterministic fallback. Freshness labels are derived from stored source metadata. External wording cannot replace the existing calculation services.
+
+Privacy-minimized `assistant_request` audit events contain only outcome, provider/response mode, latency, citation count, and validation/fallback state. They do not contain prompts, answers, passages, tokens, secrets, or financial values. Feedback stores only the selected quality category and message identity. Metrics and feedback remain user scoped; deleting a conversation deletes its message content, while minimal audit records remain for operational history.
+
+The versioned synthetic dataset and offline runner need neither a provider nor network access:
+
+```powershell
+docker compose --profile test run --build --rm `
+  -v "${PWD}\docs\evaluations:/reports" test `
+  python -m evaluation.runner `
+  --json /reports/part-13-evaluation.json `
+  --markdown /reports/part-13-evaluation.md
+```
+
+Checked-in results are in [JSON](docs/evaluations/part-13-evaluation.json) and [Markdown](docs/evaluations/part-13-evaluation.md). The evaluation measures citations, ownership, abstention, stale/conflicting evidence labels, exact deterministic calculation agreement, read-only state boundaries, cross-user isolation, and prompt-injection handling. Passing is a regression signal; it does not prove advice suitability, universal correctness, or regulatory compliance. Part 13 needs no schema change, so Alembic remains at `20261001_0011`.
+
 ## Remaining work
 
-See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), [Part 3](docs/part-3-report.md), [Part 4](docs/part-4-report.md), [Part 5](docs/part-5-report.md), [Part 6](docs/part-6-report.md), [Part 7](docs/part-7-report.md), [Part 8](docs/part-8-report.md), [Part 9](docs/part-9-report.md), [Part 10](docs/part-10-report.md), [Part 11](docs/part-11-report.md), and [Part 12](docs/part-12-report.md) verification reports.
+See the [Part 1](docs/part-1-report.md), [Part 2](docs/part-2-report.md), [Part 3](docs/part-3-report.md), [Part 4](docs/part-4-report.md), [Part 5](docs/part-5-report.md), [Part 6](docs/part-6-report.md), [Part 7](docs/part-7-report.md), [Part 8](docs/part-8-report.md), [Part 9](docs/part-9-report.md), [Part 10](docs/part-10-report.md), [Part 11](docs/part-11-report.md), [Part 12](docs/part-12-report.md), and [Part 13](docs/part-13-report.md) verification reports.
 
-Part 12 is complete. Assistant responses remain evidence explanations, not independently verified advice. Data remains user supplied, an authorized export, or a permitted API result. Scraping, background polling, purchasing, listing creation, property offers, advertising, fulfilment, autonomous decisions, and broker connectivity are not implemented.
+Part 13 is complete. Assistant responses remain evidence explanations, not independently verified advice. Data remains user supplied, an authorized export, or a permitted API result. Scraping, background polling, purchasing, listing creation, property offers, advertising, fulfilment, autonomous decisions, and broker connectivity are not implemented.
 
 References: [Compose startup and health checks](https://docs.docker.com/compose/how-tos/startup-order/), [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/), and [Expo environment variables](https://docs.expo.dev/guides/environment-variables/).
