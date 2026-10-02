@@ -67,3 +67,24 @@ def test_assistant_ready_is_explicit_and_payload_opens_only_owned_conversation()
     payload=next(x for x in provider.payloads if x["data"]["event_type"]=="assistant_response_ready")
     assert payload["data"]=={"notification_id":payload["data"]["notification_id"],"event_type":"assistant_response_ready","path":"/assistant","conversation_id":conversation["id"]}
     serialized=json.dumps(payload);assert question not in serialized and answer not in serialized and "citations" not in serialized and "PKR" not in serialized
+
+def test_diagnostics_and_confirmed_test_send_are_scoped_idempotent_and_private():
+    h,_=auth("notify-diagnostic@example.com");other,_=auth("notify-diagnostic-other@example.com");d1,t1=register_device(h,uuid.uuid4(),8);d2,t2=register_device(h,uuid.uuid4(),9);foreign,_=register_device(other,uuid.uuid4(),10)
+    diagnostics=client.get("/notifications/diagnostics",headers=h);assert diagnostics.status_code==200 and len(diagnostics.json())==2
+    assert all(x["token_exposed"] is False and "expo_push_token" not in x for x in diagnostics.json())
+    body={"device_ids":[d1["id"],d2["id"]],"idempotency_key":"explicit-test-001","confirm_send":True}
+    first=client.post("/notifications/test",headers=h,json=body);second=client.post("/notifications/test",headers=h,json=body)
+    assert first.status_code==202 and first.json()["queued_devices"]==2 and second.json()["created"] is False
+    assert client.post("/notifications/test",headers=h,json=body|{"confirm_send":False}).status_code==422
+    assert client.post("/notifications/test",headers=h,json=body|{"device_ids":[foreign["id"]],"idempotency_key":"foreign-test"}).status_code==404
+    provider=Provider([{"status":"ok","id":"test-ticket-1"},{"status":"ok","id":"test-ticket-2"}]);run_once(provider)
+    payloads=[x for x in provider.payloads if x["data"]["event_type"]=="test_notification"];assert {x["to"] for x in payloads}=={t1,t2}
+    serialized=json.dumps(payloads);assert "question" not in serialized and "answer" not in serialized and "PKR" not in serialized
+    assert all(x["data"]["path"]=="/notification-settings" for x in payloads)
+
+def test_test_notification_rate_limit_and_inactive_device():
+    h,_=auth("notify-rate@example.com");d,_=register_device(h,uuid.uuid4(),11)
+    for n in range(3):assert client.post("/notifications/test",headers=h,json={"device_ids":[d["id"]],"idempotency_key":f"rate-test-{n}","confirm_send":True}).status_code==202
+    assert client.post("/notifications/test",headers=h,json={"device_ids":[d["id"]],"idempotency_key":"rate-test-four","confirm_send":True}).status_code==429
+    h2,_=auth("notify-inactive@example.com");inactive,_=register_device(h2,uuid.uuid4(),12);client.put(f"/notifications/devices/{inactive['id']}",headers=h2,json={"notifications_enabled":False})
+    assert client.post("/notifications/test",headers=h2,json={"device_ids":[inactive["id"]],"idempotency_key":"inactive-test","confirm_send":True}).status_code==422

@@ -1,5 +1,8 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.database import check_database
 from app.config import load_settings
@@ -16,8 +19,14 @@ from app.routes_marketplace_review import router as marketplace_review_router
 from app.routes_assistant import router as assistant_router
 from app.routes_notifications import router as notifications_router
 
-load_settings()
-app = FastAPI(title="Personal AI Wealth Manager", version="0.1.0")
+settings = load_settings()
+app = FastAPI(title="Personal AI Wealth Manager", version="0.1.0", debug=settings.debug)
+if settings.allowed_hosts:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(settings.allowed_hosts))
+if settings.allowed_origins:
+    app.add_middleware(CORSMiddleware, allow_origins=list(settings.allowed_origins), allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+if settings.require_https:
+    app.add_middleware(HTTPSRedirectMiddleware)
 app.include_router(auth_router)
 app.include_router(finance_router)
 app.include_router(dashboard_router)

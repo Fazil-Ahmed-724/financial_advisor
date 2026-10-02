@@ -28,3 +28,15 @@ class ReminderCreate(BaseModel):
     def clean_key(cls,v):return " ".join(v.split())
 class DeliveryResponse(BaseModel):
     id:uuid.UUID;event_id:uuid.UUID;device_id:uuid.UUID;event_type:str;status:str;attempt_count:int;last_error_code:str|None;created_at:datetime;updated_at:datetime;acknowledged_at:datetime|None;provider_acceptance_is_device_display:bool=False
+class TestNotificationCreate(BaseModel):
+    device_ids:list[uuid.UUID]=Field(min_length=1,max_length=10);idempotency_key:str=Field(min_length=8,max_length=120);confirm_send:Literal[True]
+    @field_validator("device_ids")
+    @classmethod
+    def unique_devices(cls,v):
+        if len(v)!=len(set(v)):raise ValueError("device_ids must be unique")
+        return v
+    @field_validator("idempotency_key")
+    @classmethod
+    def clean_idempotency(cls,v):return " ".join(v.split())
+class DeviceDiagnostic(BaseModel):
+    device_id:uuid.UUID;display_name:str;platform:str;registered:bool;active:bool;push_status:str;last_seen_at:datetime;assistant_ready_eligible:bool;assistant_ready_user_opt_in:bool;assistant_ready_device_opt_in:bool;last_delivery_status:str|None;last_provider_success_status:str|None;last_provider_success_at:datetime|None;last_receipt_checked_at:datetime|None;last_error_code:str|None;token_exposed:Literal[False]=False

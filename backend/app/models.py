@@ -625,7 +625,7 @@ class AssistantMessage(Base):
     response_data:Mapped[dict|None]=mapped_column(JSON,nullable=True)
     created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now())
 
-NOTIFICATION_EVENT_TYPES=("reminder_due","assistant_response_ready","feedback_review_status_changed")
+NOTIFICATION_EVENT_TYPES=("reminder_due","assistant_response_ready","feedback_review_status_changed","test_notification")
 
 class NotificationDevice(Base):
     __tablename__="notification_devices"
@@ -655,7 +655,7 @@ class DeviceNotificationPreference(Base):
 
 class NotificationEvent(Base):
     __tablename__="notification_events"
-    __table_args__=(CheckConstraint("event_type IN ('reminder_due','assistant_response_ready','feedback_review_status_changed')",name="ck_notification_event_type"),UniqueConstraint("user_id","event_type","dedupe_key",name="uq_notification_event_dedupe"),UniqueConstraint("id","user_id",name="uq_notification_event_owner"))
+    __table_args__=(CheckConstraint("event_type IN ('reminder_due','assistant_response_ready','feedback_review_status_changed','test_notification')",name="ck_notification_event_type"),UniqueConstraint("user_id","event_type","dedupe_key",name="uq_notification_event_dedupe"),UniqueConstraint("id","user_id",name="uq_notification_event_owner"))
     id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4);user_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"),index=True);event_type:Mapped[str]=mapped_column(String(50));dedupe_key:Mapped[str]=mapped_column(String(120));deep_link:Mapped[str]=mapped_column(String(200));created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now())
 
 class NotificationDelivery(Base):

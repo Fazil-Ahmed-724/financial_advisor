@@ -1,13 +1,13 @@
 import uuid
-from datetime import datetime,timezone
+from datetime import datetime,timedelta,timezone
 from fastapi import APIRouter,Depends,HTTPException,status
-from sqlalchemy import select
+from sqlalchemy import func,select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.auth import get_current_user,get_session
 from app.models import DeviceNotificationPreference,NotificationDelivery,NotificationDevice,NotificationEvent,NotificationPreference,User
 from app.notification_service import enqueue_event
-from app.schemas_notifications import DeliveryResponse,DeviceRegister,DeviceResponse,DeviceUpdate,PreferenceResponse,PreferenceUpdate,ReminderCreate
+from app.schemas_notifications import DeliveryResponse,DeviceDiagnostic,DeviceRegister,DeviceResponse,DeviceUpdate,PreferenceResponse,PreferenceUpdate,ReminderCreate,TestNotificationCreate
 
 router=APIRouter(prefix="/notifications",tags=["informational notifications"])
 EVENTS=("reminder_due","assistant_response_ready","feedback_review_status_changed")
@@ -44,6 +44,15 @@ def revoke_device(device_id:uuid.UUID,user:User=Depends(get_current_user),sessio
 @router.get("/preferences",response_model=list[PreferenceResponse])
 def preferences(user:User=Depends(get_current_user),session:Session=Depends(get_session)):
     rows=session.scalars(select(NotificationPreference).where(NotificationPreference.user_id==user.id)).all();return [PreferenceResponse(event_type=e,enabled=next((x.enabled for x in rows if x.event_type==e),False)) for e in EVENTS]
+@router.get("/diagnostics",response_model=list[DeviceDiagnostic])
+def diagnostics(user:User=Depends(get_current_user),session:Session=Depends(get_session)):
+    user_opt_in=session.scalar(select(NotificationPreference.enabled).where(NotificationPreference.user_id==user.id,NotificationPreference.event_type=="assistant_response_ready")) is True;result=[]
+    for device in session.scalars(select(NotificationDevice).where(NotificationDevice.user_id==user.id).order_by(NotificationDevice.last_seen_at.desc())).all():
+        device_opt_in=session.scalar(select(DeviceNotificationPreference.enabled).where(DeviceNotificationPreference.user_id==user.id,DeviceNotificationPreference.device_id==device.id,DeviceNotificationPreference.event_type=="assistant_response_ready")) is True
+        last=session.scalar(select(NotificationDelivery).where(NotificationDelivery.user_id==user.id,NotificationDelivery.device_id==device.id).order_by(NotificationDelivery.created_at.desc()).limit(1));success=session.scalar(select(NotificationDelivery).where(NotificationDelivery.user_id==user.id,NotificationDelivery.device_id==device.id,NotificationDelivery.status.in_(["accepted","delivered"])).order_by(NotificationDelivery.updated_at.desc()).limit(1))
+        active=device.revoked_at is None and device.notifications_enabled and device.push_status=="active" and device.expo_push_token is not None
+        result.append(DeviceDiagnostic(device_id=device.id,display_name=device.display_name,platform=device.platform,registered=True,active=active,push_status=device.push_status,last_seen_at=device.last_seen_at,assistant_ready_eligible=active and user_opt_in and device_opt_in,assistant_ready_user_opt_in=user_opt_in,assistant_ready_device_opt_in=device_opt_in,last_delivery_status=last.status if last else None,last_provider_success_status=success.status if success else None,last_provider_success_at=(success.receipt_checked_at or success.accepted_at) if success else None,last_receipt_checked_at=last.receipt_checked_at if last else None,last_error_code=last.last_error_code if last else None))
+    return result
 @router.put("/preferences",response_model=PreferenceResponse)
 def update_preference(payload:PreferenceUpdate,user:User=Depends(get_current_user),session:Session=Depends(get_session)):
     if payload.device_id:
@@ -60,6 +69,21 @@ def reminder(payload:ReminderCreate,user:User=Depends(get_current_user),session:
         session.rollback();event=session.scalar(select(NotificationEvent).where(NotificationEvent.user_id==user.id,NotificationEvent.event_type=="reminder_due",NotificationEvent.dedupe_key==payload.dedupe_key));created=False
         if not event:raise HTTPException(409,"Reminder request conflicted; retry with the same key") from None
     return {"event_id":event.id,"created":created,"informational_only":True,"financial_action":False}
+@router.post("/test",status_code=202)
+def test_notification(payload:TestNotificationCreate,user:User=Depends(get_current_user),session:Session=Depends(get_session)):
+    existing=session.scalar(select(NotificationEvent).where(NotificationEvent.user_id==user.id,NotificationEvent.event_type=="test_notification",NotificationEvent.dedupe_key==payload.idempotency_key))
+    if existing:return {"event_id":existing.id,"created":False,"queued_devices":session.scalar(select(func.count()).select_from(NotificationDelivery).where(NotificationDelivery.user_id==user.id,NotificationDelivery.event_id==existing.id)),"informational_only":True,"financial_action":False}
+    recent=session.scalar(select(func.count()).select_from(NotificationEvent).where(NotificationEvent.user_id==user.id,NotificationEvent.event_type=="test_notification",NotificationEvent.created_at>=datetime.now(timezone.utc)-timedelta(minutes=10)))
+    if recent>=3:raise HTTPException(429,"Test notification limit reached; try again later")
+    devices=session.scalars(select(NotificationDevice).where(NotificationDevice.user_id==user.id,NotificationDevice.id.in_(payload.device_ids))).all()
+    if len(devices)!=len(payload.device_ids):raise HTTPException(404,"One or more devices were not found")
+    if any(d.revoked_at is not None or not d.notifications_enabled or d.push_status!="active" or not d.expo_push_token for d in devices):raise HTTPException(422,"Every selected device must be active and notification-enabled")
+    event=NotificationEvent(user_id=user.id,event_type="test_notification",dedupe_key=payload.idempotency_key,deep_link="/notification-settings");session.add(event);session.flush()
+    for device in devices:session.add(NotificationDelivery(user_id=user.id,event_id=event.id,device_id=device.id))
+    try:session.commit()
+    except IntegrityError:
+        session.rollback();event=session.scalar(select(NotificationEvent).where(NotificationEvent.user_id==user.id,NotificationEvent.event_type=="test_notification",NotificationEvent.dedupe_key==payload.idempotency_key));return {"event_id":event.id,"created":False,"queued_devices":session.scalar(select(func.count()).select_from(NotificationDelivery).where(NotificationDelivery.user_id==user.id,NotificationDelivery.event_id==event.id)),"informational_only":True,"financial_action":False}
+    return {"event_id":event.id,"created":True,"queued_devices":len(devices),"informational_only":True,"financial_action":False}
 def delivery_body(session,row):
     event=session.scalar(select(NotificationEvent).where(NotificationEvent.id==row.event_id,NotificationEvent.user_id==row.user_id));return DeliveryResponse(id=row.id,event_id=row.event_id,device_id=row.device_id,event_type=event.event_type,status=row.status,attempt_count=row.attempt_count,last_error_code=row.last_error_code,created_at=row.created_at,updated_at=row.updated_at,acknowledged_at=row.acknowledged_at)
 @router.get("/history",response_model=list[DeliveryResponse])

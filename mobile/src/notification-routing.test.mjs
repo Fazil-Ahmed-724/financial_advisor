@@ -6,3 +6,4 @@ test('assistant notification opens its conversation when authenticated',()=>asse
 test('authentication is required',()=>assert.equal(notificationRoute({path:'/assistant',event_type:'assistant_response_ready',conversation_id:id},false),null));
 test('rejects missing IDs and unsupported paths',()=>{assert.equal(notificationRoute({path:'/assistant',event_type:'assistant_response_ready'},true),null);assert.equal(notificationRoute({path:'/trade',conversation_id:id},true),null)});
 test('non-assistant allowlisted routes remain bounded',()=>assert.equal(notificationRoute({path:'/assistant-feedback',event_type:'feedback_review_status_changed'},true),'/assistant-feedback'));
+test('generic test notification opens settings when authenticated',()=>assert.equal(notificationRoute({path:'/notification-settings',event_type:'test_notification'},true),'/notification-settings'));

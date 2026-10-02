@@ -477,6 +477,10 @@ Part 16 adds informational notifications through a transactional PostgreSQL outb
 
 Supported event types are limited to `reminder_due`, explicitly requested `assistant_response_ready`, and `feedback_review_status_changed`. Push payloads contain fixed generic text, an event ID/type, and an allowlisted in-app path. They never contain balances, holdings, tax data, book passages, marketplace/property content, prompts, assistant answers, or transaction instructions.
 
+Part 17 adds `GET /notifications/diagnostics` and `POST /notifications/test`. Diagnostics expose registration, permission-independent server state, opt-in eligibility, last delivery/receipt state, and sanitized error codes without exposing tokens. Test sends require selected owned active devices, `confirm_send: true`, and an idempotency key; they are rate limited and use the normal outbox. See [the two-device test guide](docs/part-17-device-test.md) and [Part 17 report](docs/part-17-report.md).
+
+For production set a unique `AUTH_SECRET`, `APP_ENV=production`, `APP_DEBUG=false`, explicit `ALLOWED_HOSTS`, HTTPS-only `ALLOWED_ORIGINS` when browser origins are needed, and `REQUIRE_HTTPS=true`. Startup fails closed when these controls are insecure. Terminate TLS at a trusted proxy and keep PostgreSQL, the API, and worker on a private network.
+
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `POST`, `GET` | `/notifications/devices` | Register/rotate the current token or list owned devices |

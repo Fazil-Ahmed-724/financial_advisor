@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from app.models import DeviceNotificationPreference,NotificationDelivery,NotificationDevice,NotificationEvent,NotificationPreference
 
 EVENT_LINKS={"reminder_due":"/","assistant_response_ready":"/assistant","feedback_review_status_changed":"/assistant-feedback"}
-GENERIC_MESSAGES={"reminder_due":("Wealth Manager reminder","Open the app to review your reminder."),"assistant_response_ready":("Research update ready","Open the app to review your research update."),"feedback_review_status_changed":("Review status updated","Open the app to review the status update.")}
+GENERIC_MESSAGES={"reminder_due":("Wealth Manager reminder","Open the app to review your reminder."),"assistant_response_ready":("Research update ready","Open the app to review your research update."),"feedback_review_status_changed":("Review status updated","Open the app to review the status update."),"test_notification":("Wealth Manager test","Open the app to confirm notification routing.")}
 
 def eligible_devices(session,user_id,event_type):
     user_pref=session.scalar(select(NotificationPreference.enabled).where(NotificationPreference.user_id==user_id,NotificationPreference.event_type==event_type))
