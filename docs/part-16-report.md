@@ -14,13 +14,13 @@ Receipts are scheduled 15 minutes after ticket acceptance, consistent with Expo 
 
 All user and device event preferences default off. Eligibility requires an active token, device enabled, user event enabled, and device event enabled. The allowlist is `reminder_due`, explicitly requested `assistant_response_ready`, and `feedback_review_status_changed`. Assistant tools and initial feedback submissions cannot create notification events. Notification actions are informational and expose no financial mutation capability.
 
-Provider payloads use fixed generic title/body text plus a notification ID, allowlisted event type, and allowlisted authenticated-app path. No balance, holding, tax value, passage, property/marketplace content, prompt, assistant answer, or transaction instruction enters the payload. Tokens and message content are not logged.
+Provider payloads use fixed generic title/body text plus a notification ID, allowlisted event type, and allowlisted authenticated-app path. An assistant-ready payload also carries the opaque owned conversation UUID so the authenticated app can open the relevant conversation. It contains no question, answer, citation, balance, holding, tax value, passage, property/marketplace content, or transaction instruction. Tokens and message content are not logged.
 
 ## Device sessions and mobile behavior
 
 Mobile authentication now supplies a locally stored installation UUID, platform, and display name. The backend issues a JWT containing the device ID and session version. Revoking that owned device clears its token, disables pending delivery, increments its session version, and immediately invalidates that device-bound JWT. Older clients may omit device metadata and retain the existing short-lived user-token behavior.
 
-The Expo SDK 57 app uses `expo-notifications` and `expo-device`. Registration is explicit, requests permission only from the settings screen, handles denial or token failure visibly, and initially leaves delivery disabled. Registering again safely rotates the token. Logout attempts device revocation before deleting the SecureStore token; local logout still completes during an API outage. Notification taps accept only `/`, `/decisions`, `/assistant`, or `/assistant-feedback` and then rely on normal authenticated routes.
+The Expo SDK 57 app uses `expo-notifications` and `expo-device`. Registration is explicit, requests permission only from the settings screen, handles denial or token failure visibly, and initially leaves delivery disabled. Registering again safely rotates the token. Logout attempts device revocation before deleting the SecureStore token; local logout still completes during an API outage. Notification taps validate authentication, event type, allowlisted path, and UUID shape. Assistant-ready taps open the referenced conversation through its existing user-scoped API; malformed, unauthenticated, or unsupported routes are ignored.
 
 Remote push requires a physical device and development/production build; it is unavailable in Expo Go for this SDK. `EXPO_PUBLIC_EAS_PROJECT_ID`, Android FCM v1 credentials and/or Apple push credentials remain operator requirements. No real push or physical-device test was performed.
 
@@ -65,6 +65,9 @@ Assistant message requests additionally accept `notify_when_ready: true`; it sti
 - `mobile/src/app/notification-settings.tsx`
 - `mobile/src/auth.tsx`
 - `mobile/src/notifications.ts`
+- `mobile/src/notification-routing.js`
+- `mobile/src/notification-routing.d.ts`
+- `mobile/src/notification-routing.test.mjs`
 - `mobile/src/types.ts`
 - `docs/part-16-report.md`
 
@@ -79,6 +82,7 @@ docker compose --profile test run --build --rm test python -m evaluation.runner 
 Set-Location mobile
 npm.cmd run typecheck
 npm.cmd run lint
+npm.cmd run test:navigation
 npx.cmd expo install --check
 npx.cmd expo-doctor
 Set-Location ..
@@ -99,10 +103,11 @@ Results:
 - Clean disposable migration chain through `20261002_0012`: passed.
 - Alembic model check: no new upgrade operations detected.
 - Focused notification/authentication tests: **13 passed**.
-- Complete backend suite: **105 passed in 28.73 seconds**, with one upstream Starlette TestClient deprecation warning.
+- Complete backend suite after the conversation-targeted mobile notification update: **106 passed in 23.37 seconds**, with one upstream Starlette TestClient deprecation warning.
 - Part 13 offline deterministic evaluation: **14/14 passed**, provider disabled and network access false.
 - Multi-device fanout, disabled devices, idempotency, user isolation, device-session revocation, timeout recovery, bounded retry/dead-letter, invalid token handling, ticket/receipt processing, generic payload privacy, log privacy, and financial/assistant mutation invariants: passed with mocked providers.
 - Mobile TypeScript and Expo lint: passed.
+- Mocked mobile notification navigation: **4/4 passed** for authenticated conversation routing and rejection of unauthenticated, malformed, or unsupported routes.
 - `expo install --check`: dependencies up to date.
 - Expo Doctor: **21/21 checks passed**.
 - Development Alembic state: `20261002_0012 (head)`.

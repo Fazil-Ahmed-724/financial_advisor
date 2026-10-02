@@ -504,4 +504,6 @@ docker compose exec notification-worker python -m app.notification_worker receip
 
 Part 16 is complete. Notifications remain informational and cannot place orders, make offers or purchases, mutate financial records, or turn assistant output into executable instructions. Market polling, price alerts, inferred urgency, and external market-data collection are not implemented.
 
+Assistant chat remains available from the main mobile screen on iOS and Android. Each request has an explicit, off-by-default **Notify me when ready** choice. An assistant-ready push contains only generic text, event metadata, an allowlisted `/assistant` route, and the opaque conversation UUID. After authentication, tapping it opens that owned conversation; the push never includes the question, answer, citations, evidence, limitations, or financial data.
+
 References: [Compose startup and health checks](https://docs.docker.com/compose/how-tos/startup-order/), [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/), and [Expo environment variables](https://docs.expo.dev/guides/environment-variables/).
