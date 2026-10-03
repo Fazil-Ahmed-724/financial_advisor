@@ -48,16 +48,69 @@ Imported prices remain user supplied and unverified. Last-observed raw closes ar
 
 ## Verification status
 
-Docker was checked before health verification and was unavailable because the Docker Desktop Linux engine pipe did not exist. Therefore the backend Docker suite, Part 13 offline evaluation, live Alembic current/check, container health, API health, cluster identity, and live development row-count checks could not be rerun in this session. The development volume was not reset, recreated, or modified. The repository migration head is `20261003_0015`; it was not applied while Docker was unavailable. The last cluster identity recorded by a previously verified project report is `7690665958609113124`, but a current comparison was not possible.
+Docker Desktop was initially stopped and was started for this verification. Docker automatically restored the previously created development containers. Before any explicit migration command, the database reported cluster identity `7690665958609113124`, exactly matching the recorded value. No volume was deleted, reset, or recreated.
 
-Checks completed without Docker:
+The restored API image still contained repository head `20261003_0014`. After rebuilding the existing images from the current tree, the existing migration was applied in place:
 
-- Python syntax compilation for backend application, tests, and migrations: passed before the final assistant evidence-reference adjustment. A final rerun was attempted but the command runner returned `helper_unknown_error` before starting Python.
-- Mobile TypeScript: passed.
+```powershell
+docker compose -f compose.yaml build api notification-worker test
+docker compose -f compose.yaml run --rm api alembic upgrade head
+docker compose -f compose.yaml up -d --no-deps api notification-worker
+```
+
+Alembic upgraded `20261003_0014 -> 20261003_0015`. The final live checks report `20261003_0015 (head)` and `No new upgrade operations detected` from `alembic check`.
+
+Backend and assistant evaluation:
+
+```powershell
+docker compose -f compose.yaml --profile test run --rm test
+docker compose -f compose.yaml --profile test run --rm `
+  -v "${PWD}\docs\evaluations:/reports" test `
+  python -m evaluation.runner `
+  --json /reports/part-13-evaluation.json `
+  --markdown /reports/part-13-evaluation.md
+```
+
+- Complete backend suite: 119 passed, one third-party Starlette/httpx deprecation warning, in 29.15 seconds.
+- Part 13 offline evaluation: 14/14 passed, provider disabled, network access false, zero failed cases.
+- An initial `pytest -q` override failed collection because invoking the installed pytest script omitted `/app` from Python's import path. Rerunning the project-configured `python -m pytest` command passed; no code change was required.
+
+Live database and service verification:
+
+```powershell
+docker compose -f compose.yaml exec -T api alembic current
+docker compose -f compose.yaml exec -T api alembic check
+docker compose -f compose.yaml exec -T db psql -U wealth_local -d wealth_manager -At -c "SELECT system_identifier FROM pg_control_system()"
+curl.exe --fail --silent --show-error http://127.0.0.1:8000/health/live
+curl.exe --fail --silent --show-error http://127.0.0.1:8000/health/ready
+docker compose -f compose.yaml ps
+```
+
+- Cluster identity after migration: `7690665958609113124`, unchanged.
+- Development row counts after migration: users 0, investment trades 0, PSX observations 0, portfolio mappings 0. The new table exists and no pre-existing domain rows were removed.
+- `/health/live`: `{"status":"ok"}`.
+- `/health/ready`: `{"status":"ok","database":"connected"}`.
+- API, PostgreSQL, and notification worker: healthy. Development services were left running.
+
+Mobile and repository checks:
+
+```powershell
+cd mobile
+npm.cmd run typecheck
+npm.cmd run lint
+npx.cmd expo install --check
+npx.cmd expo-doctor
+cd ..
+git diff --check
+git status --short
+```
+
+- TypeScript: passed.
 - Expo lint: passed.
-- Expo dependency validation: passed; dependencies match the installed Expo SDK.
-- Expo Doctor: passed, 21/21 checks.
-- Compose validation with `docker compose config --quiet`: passed.
-- Git whitespace validation: passed before the final report/evidence edits. A final rerun was attempted but the command runner returned `helper_unknown_error` before starting Git.
+- Expo dependency validation: dependencies up to date.
+- Expo Doctor: 21/21 checks passed.
+- Compose validation with `docker compose -f compose.yaml config --quiet`: passed.
+- `git diff --check`: passed after the report update; the only output was an expected Windows LF-to-CRLF conversion warning for this Markdown file.
+- Final Git status contains one intended modification: `docs/part-19-report.md`. Regenerated evaluation outputs were byte-for-byte unchanged.
 
 No emulator or physical-device testing was performed.
