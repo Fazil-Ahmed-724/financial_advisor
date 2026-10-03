@@ -494,6 +494,19 @@ CSV columns are `symbol,observation_date,open,high,low,close,volume,currency,sou
 
 Analysis returns period return, annualized rolling volatility, moving average, and RSI when enough observations exist. Results include observation IDs, source dates, sources, raw/adjusted status, freshness, detected gaps, formulas, and limitations. An `as_of_date` excludes later observations to prevent look-ahead. Results are hypothetical historical evidence without buy/sell/suitability labels. See [Part 18 report](docs/part-18-report.md).
 
+## Portfolio exposure and historical scenarios
+
+Part 19 adds authenticated `/api/v1/portfolio-analysis` endpoints and a mobile Portfolio Exposure screen. A user explicitly confirms a mapping between an owned investment-account holding symbol and an owned imported PSX symbol. Each confirmation or change writes an audit event. Latest quantities, FIFO lots, and book costs come directly from the existing holdings service; historical scenarios replay only recorded external trades through the selected date.
+
+Observed valuation uses only the last user-owned **raw** closing observation on or before the as-of date. Adjusted observations are used only for historical return, annualized volatility, and maximum-drawdown research. Missing and stale inputs remain labeled. Position weights use available observed values, and the concentration HHI is the sum of squared available position weights.
+
+- `GET/PUT /api/v1/portfolio-analysis/mappings`
+- `GET /api/v1/portfolio-analysis/mappings/{mapping_id}/audit`
+- `GET /api/v1/portfolio-analysis?as_of_date=YYYY-MM-DD&lookback=30`
+- `POST /api/v1/portfolio-analysis/sale-estimate`
+
+Sale estimates use existing FIFO allocation and effective-dated user tax rules. Missing tax rules produce an unavailable tax estimate rather than an invented rate. These APIs do not post ledger entries, consume lots, save trades, create sale-analysis records, or place orders. See [Part 19 report](docs/part-19-report.md).
+
 For production set a unique `AUTH_SECRET`, `APP_ENV=production`, `APP_DEBUG=false`, explicit `ALLOWED_HOSTS`, HTTPS-only `ALLOWED_ORIGINS` when browser origins are needed, and `REQUIRE_HTTPS=true`. Startup fails closed when these controls are insecure. Terminate TLS at a trusted proxy and keep PostgreSQL, the API, and worker on a private network.
 
 | Method | Path | Purpose |

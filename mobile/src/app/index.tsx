@@ -105,6 +105,7 @@ export default function HomeScreen() {
       <Link href="/marketplace-import" asChild><ActionButton title="Import marketplace evidence" onPress={() => {}} /></Link>
       <Link href="/assistant" asChild><ActionButton title="Cited research assistant" onPress={() => {}} /></Link>
       <Link href="/psx-research" asChild><ActionButton title="PSX historical research" onPress={() => {}} /></Link>
+      <Link href="/portfolio-analysis" asChild><ActionButton title="Portfolio exposure and scenarios" onPress={() => {}} /></Link>
       <Link href="/notification-settings" asChild><ActionButton title="Notifications and devices" onPress={() => {}} /></Link>
       {error ? <Text style={ui.error}>{error}</Text> : null}
       {message ? <Text style={ui.success}>{message}</Text> : null}

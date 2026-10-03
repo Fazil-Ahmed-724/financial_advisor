@@ -617,6 +617,18 @@ class PsxPriceObservation(Base):
     __tablename__="psx_price_observations";__table_args__=(UniqueConstraint("user_id","symbol","observation_date","adjustment_type",name="uq_psx_user_symbol_date_adjustment"),CheckConstraint("open_price>0 AND high_price>0 AND low_price>0 AND close_price>0",name="ck_psx_positive_prices"),CheckConstraint("volume>=0",name="ck_psx_nonnegative_volume"))
     id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4);user_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"),index=True);import_batch_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("psx_import_batches.id",ondelete="RESTRICT"),index=True);symbol:Mapped[str]=mapped_column(String(20),index=True);observation_date:Mapped[date]=mapped_column(index=True);open_price:Mapped[Decimal]=mapped_column(Numeric(18,4));high_price:Mapped[Decimal]=mapped_column(Numeric(18,4));low_price:Mapped[Decimal]=mapped_column(Numeric(18,4));close_price:Mapped[Decimal]=mapped_column(Numeric(18,4));volume:Mapped[int]=mapped_column(BigInteger);currency:Mapped[str]=mapped_column(String(3));source_name:Mapped[str]=mapped_column(String(200));adjustment_type:Mapped[str]=mapped_column(String(10));verification_status:Mapped[str]=mapped_column(String(20),server_default="unverified");created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now())
 
+class PortfolioInstrumentMapping(Base):
+    __tablename__="portfolio_instrument_mappings"
+    __table_args__=(UniqueConstraint("user_id","investment_account_id","holding_symbol",name="uq_portfolio_holding_mapping"),ForeignKeyConstraint(["investment_account_id","user_id"],["accounts.id","accounts.user_id"],ondelete="CASCADE",name="fk_portfolio_mapping_account_owner"))
+    id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
+    user_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"),index=True)
+    investment_account_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),nullable=False)
+    holding_symbol:Mapped[str]=mapped_column(String(20))
+    psx_symbol:Mapped[str]=mapped_column(String(20))
+    confirmation_note:Mapped[str|None]=mapped_column(String(500),nullable=True)
+    confirmed_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now())
+    updated_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now(),onupdate=func.now())
+
 class AssistantConversation(Base):
     __tablename__="assistant_conversations"
     __table_args__=(UniqueConstraint("id","user_id",name="uq_assistant_conversation_owner"),)

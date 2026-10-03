@@ -6,10 +6,11 @@ from sqlalchemy import func,or_,select
 from sqlalchemy.orm import Session
 from app.assistant_provider import DeterministicProvider,provider
 from app.marketplace_policy import FRESHNESS
-from app.models import Account,Book,BookPassage,DecisionReview,FinancialProfile,InvestmentDecision,MarketplaceCompetitionSignal,MarketplaceProduct,MarketplaceProductObservation,MarketplaceProductRanking,MarketplaceSourcingOption,OpportunityAnalysis,PropertyListing,PsxPriceObservation,SaleAnalysis,TaxRule,User
+from app.models import Account,Book,BookPassage,DecisionReview,FinancialProfile,InvestmentDecision,InvestmentTrade,MarketplaceCompetitionSignal,MarketplaceProduct,MarketplaceProductObservation,MarketplaceProductRanking,MarketplaceSourcingOption,OpportunityAnalysis,PortfolioInstrumentMapping,PropertyListing,PsxPriceObservation,SaleAnalysis,TaxRule,User
 from app.routes_dashboard import ledger_totals
 from app.routes_investments import holdings
 from app.psx_service import analyze as analyze_psx
+from app.portfolio_service import positions as portfolio_positions
 from app.schemas_assistant import AssistantAnswer
 
 LIMIT=int(os.environ.get("ASSISTANT_RETRIEVAL_LIMIT","8"));MAX_CONTEXT=int(os.environ.get("ASSISTANT_MAX_CONTEXT_CHARS","12000"));MAX_OUTPUT=int(os.environ.get("ASSISTANT_MAX_OUTPUT_CHARS","12000"))
@@ -56,12 +57,23 @@ def retrieve(session:Session,user:User,question:str):
             account=session.scalar(select(Account).where(Account.user_id==user.id,Account.type==account_type).order_by(Account.created_at).limit(1))
             if account:add("ledger_balance",account.id,account.updated_at,f"{account_type} ledger total: {value} PKR; debit-positive ledger convention",f"/accounts","user_entered",{"service":"ledger_totals","value":str(value)})
         if profile:add("financial_profile",user.id,profile.updated_at,f"Monthly essential expenses {profile.monthly_essential_expenses} PKR; emergency reserve target {profile.reserve_months} months",f"/","user_entered")
-    if any(x in q for x in ("holding","stock","fifo","gain","sale","tax","fee")):
+    if any(x in q for x in ("holding","stock","fifo","gain","sale","tax","fee","portfolio","exposure","concentration")):
         for h in holdings(user,session)[:LIMIT]:
             lot=h.lots[0] if h.lots else None;rid=lot.id if lot else h.investment_account_id
             add("holding",rid,datetime.combine(lot.acquired_on,datetime.min.time(),tzinfo=timezone.utc) if lot else None,f"{h.symbol}: quantity {h.quantity}; remaining FIFO book cost {h.remaining_book_cost} PKR; realized gain/loss {h.realized_gain_loss} PKR",f"/holdings","estimated",{"service":"holdings","quantity":str(h.quantity),"book_cost":str(h.remaining_book_cost),"realized_gain_loss":str(h.realized_gain_loss)})
         for a in session.scalars(select(SaleAnalysis).where(SaleAnalysis.user_id==user.id).order_by(SaleAnalysis.calculated_at.desc()).limit(3)).all():add("sale_analysis",a.id,a.calculated_at,f"{a.symbol} hypothetical sale: FIFO cost {a.fifo_cost_basis} PKR; fees {a.estimated_fees} PKR; estimated tax {a.estimated_tax}; net result {a.net_profit_loss} PKR; tax status {a.tax_status}",f"/analysis","estimated",{"service":"saved_sale_analysis","id":str(a.id),"gross_proceeds":str(a.gross_proceeds),"fifo_cost_basis":str(a.fifo_cost_basis),"fees":str(a.estimated_fees),"estimated_tax":None if a.estimated_tax is None else str(a.estimated_tax),"net_proceeds":str(a.net_proceeds),"net_profit_loss":str(a.net_profit_loss)})
         for r in session.scalars(select(TaxRule).where(TaxRule.user_id==user.id).order_by(TaxRule.effective_from.desc()).limit(2)).all():add("tax_rule",r.id,r.created_at,f"User-entered gain tax rate {r.gain_tax_rate}% effective {r.effective_from}; source note: {r.source_note}",f"/analysis","user_entered")
+    if any(x in q for x in ("portfolio","exposure","concentration","observed value","unrealized")):
+        ps,totals=portfolio_positions(session,user,datetime.now(timezone.utc).date())
+        for p in ps[:LIMIT]:
+            if p["mapping_id"]:
+                mapping=session.get(PortfolioInstrumentMapping,p["mapping_id"]);add("portfolio_mapping",mapping.id,mapping.updated_at,f"User-confirmed mapping {p['holding_symbol']} to PSX {p['psx_symbol']} for investment account {p['investment_account_id']}",f"/portfolio-analysis","user_entered")
+            if p["price_observation_id"]:
+                price=session.get(PsxPriceObservation,p["price_observation_id"]);add("psx_price_observation",price.id,datetime.combine(price.observation_date,datetime.min.time(),tzinfo=timezone.utc),f"Raw close {price.close_price} PKR for {price.symbol} observed {price.observation_date}; source {price.source_name}; {price.verification_status}; {p['price_freshness']}",f"/portfolio-analysis","stale" if p["price_freshness"]=="stale" else "unverified",{"service":"portfolio_exposure_v1","position":p,"totals":totals})
+            for lot in p["lot_references"]:
+                trade=session.get(InvestmentTrade,lot["trade_id"])
+                if trade and trade.user_id==user.id:
+                    add("investment_trade",trade.id,datetime.combine(trade.trade_date,datetime.min.time(),tzinfo=timezone.utc),f"Recorded {trade.side} trade for {trade.quantity} {trade.symbol} on {trade.trade_date}; this FIFO lot contributes {lot['quantity']} units and {lot['book_cost']} PKR book cost to the scenario",f"/holdings","user_entered")
     if any(x in q for x in ("property","karachi","rent","listing")):
         for r in session.scalars(select(PropertyListing).where(PropertyListing.user_id==user.id).order_by(PropertyListing.observed_at.desc()).limit(LIMIT)).all():add("property_listing",r.id,r.observed_at,f"{r.area_name} {r.property_type} {r.purpose}; asking amount {r.asking_amount} PKR; {r.area_amount} {r.area_unit}; source {r.source_name}; asking price is unverified",f"/property",age_label(r.observed_at),None,f"property:{r.area_name.lower()}:{r.property_type}:{r.purpose}",str(r.asking_amount))
         for a in session.scalars(select(OpportunityAnalysis).where(OpportunityAnalysis.user_id==user.id,OpportunityAnalysis.domain=="karachi_real_estate").order_by(OpportunityAnalysis.calculated_at.desc()).limit(3)).all():add("property_analysis",a.id,a.calculated_at,f"Stored {a.analyzer_version} calculation: {a.calculated_metrics}; limitations: {a.limitations}",f"/property","estimated",{"service":a.analyzer_version,"metrics":a.calculated_metrics})
