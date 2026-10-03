@@ -479,6 +479,21 @@ Supported event types are limited to `reminder_due`, explicitly requested `assis
 
 Part 17 adds `GET /notifications/diagnostics` and `POST /notifications/test`. Diagnostics expose registration, permission-independent server state, opt-in eligibility, last delivery/receipt state, and sanitized error codes without exposing tokens. Test sends require selected owned active devices, `confirm_send: true`, and an idempotency key; they are rate limited and use the normal outbox. See [the two-device test guide](docs/part-17-device-test.md) and [Part 17 report](docs/part-17-report.md).
 
+## PSX historical research
+
+Part 18 provides an authenticated, user-scoped workspace under `/api/v1/psx`. It accepts manually supplied or otherwise authorized CSV files, previews every row, requires explicit resolution of duplicates and invalid rows, and commits reviewed rows atomically. It does not scrape, poll, call a broker, download missing prices, send price alerts, or create trades.
+
+CSV columns are `symbol,observation_date,open,high,low,close,volume,currency,source,adjustment_type`. Dates use `YYYY-MM-DD`; prices are positive decimals with at most four places; volume is a nonnegative whole number; currency is `PKR`; adjustment type is `raw` or `adjusted`. High must be at least open, low, and close; low must be at most them. Source/provenance is required. Uploaded evidence is labeled unverified.
+
+- `POST/GET /api/v1/psx/imports`
+- `GET /api/v1/psx/imports/{id}/preview`
+- `PUT /api/v1/psx/imports/{id}/rows/{row_id}`
+- `POST /api/v1/psx/imports/{id}/commit` or `/cancel`
+- `GET /api/v1/psx/instruments` and `/instruments/{symbol}/history`
+- `POST /api/v1/psx/analysis`
+
+Analysis returns period return, annualized rolling volatility, moving average, and RSI when enough observations exist. Results include observation IDs, source dates, sources, raw/adjusted status, freshness, detected gaps, formulas, and limitations. An `as_of_date` excludes later observations to prevent look-ahead. Results are hypothetical historical evidence without buy/sell/suitability labels. See [Part 18 report](docs/part-18-report.md).
+
 For production set a unique `AUTH_SECRET`, `APP_ENV=production`, `APP_DEBUG=false`, explicit `ALLOWED_HOSTS`, HTTPS-only `ALLOWED_ORIGINS` when browser origins are needed, and `REQUIRE_HTTPS=true`. Startup fails closed when these controls are insecure. Terminate TLS at a trusted proxy and keep PostgreSQL, the API, and worker on a private network.
 
 | Method | Path | Purpose |

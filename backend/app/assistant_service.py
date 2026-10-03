@@ -6,9 +6,10 @@ from sqlalchemy import func,or_,select
 from sqlalchemy.orm import Session
 from app.assistant_provider import DeterministicProvider,provider
 from app.marketplace_policy import FRESHNESS
-from app.models import Account,Book,BookPassage,DecisionReview,FinancialProfile,InvestmentDecision,MarketplaceCompetitionSignal,MarketplaceProduct,MarketplaceProductObservation,MarketplaceProductRanking,MarketplaceSourcingOption,OpportunityAnalysis,PropertyListing,SaleAnalysis,TaxRule,User
+from app.models import Account,Book,BookPassage,DecisionReview,FinancialProfile,InvestmentDecision,MarketplaceCompetitionSignal,MarketplaceProduct,MarketplaceProductObservation,MarketplaceProductRanking,MarketplaceSourcingOption,OpportunityAnalysis,PropertyListing,PsxPriceObservation,SaleAnalysis,TaxRule,User
 from app.routes_dashboard import ledger_totals
 from app.routes_investments import holdings
+from app.psx_service import analyze as analyze_psx
 from app.schemas_assistant import AssistantAnswer
 
 LIMIT=int(os.environ.get("ASSISTANT_RETRIEVAL_LIMIT","8"));MAX_CONTEXT=int(os.environ.get("ASSISTANT_MAX_CONTEXT_CHARS","12000"));MAX_OUTPUT=int(os.environ.get("ASSISTANT_MAX_OUTPUT_CHARS","12000"))
@@ -27,6 +28,20 @@ def retrieve(session:Session,user:User,question:str):
     if terms:
         ts=func.websearch_to_tsquery("simple"," OR ".join(terms));rows=session.execute(select(Book,BookPassage).join(BookPassage,BookPassage.book_id==Book.id).where(Book.user_id==user.id,BookPassage.search_vector.op("@@")(ts)).order_by(func.ts_rank(BookPassage.search_vector,ts).desc()).limit(LIMIT)).all()
         for b,p in rows:add("book_passage",p.id,None,f"{b.title}, {p.reference_label}: {p.content}",f"/books/{b.id}","undated")
+    if "psx" in q or "price" in q or "stock" in q or any(session.scalar(select(PsxPriceObservation.id).where(PsxPriceObservation.user_id==user.id,PsxPriceObservation.symbol==t.upper())) for t in terms):
+        stmt=select(PsxPriceObservation).where(PsxPriceObservation.user_id==user.id)
+        symbols=[t.upper() for t in terms if re.fullmatch(r"[a-z0-9.-]{1,20}",t)]
+        if symbols:stmt=stmt.where(PsxPriceObservation.symbol.in_(symbols))
+        psx_rows=session.scalars(stmt.order_by(PsxPriceObservation.observation_date.desc()).limit(LIMIT)).all()
+        calculations={}
+        for symbol in {x.symbol for x in psx_rows}:
+            owned_rows=session.scalars(select(PsxPriceObservation).where(PsxPriceObservation.user_id==user.id,PsxPriceObservation.symbol==symbol).order_by(PsxPriceObservation.observation_date)).all()
+            if len(owned_rows)>=2:
+                try:calculations[symbol]=analyze_psx(owned_rows,min(14,len(owned_rows)))
+                except ValueError:pass
+        for x in psx_rows:
+            calc=calculations.pop(x.symbol,None);summary=f"; deterministic historical calculation {calc}" if calc else ""
+            add("psx_price_observation",x.id,datetime.combine(x.observation_date,datetime.min.time(),tzinfo=timezone.utc),f"{x.symbol} {x.observation_date}: open {x.open_price}, high {x.high_price}, low {x.low_price}, close {x.close_price} {x.currency}, volume {x.volume}; {x.adjustment_type}; source {x.source_name}; unverified{summary}",f"/psx-research?symbol={x.symbol}",age_label(datetime.combine(x.observation_date,datetime.min.time(),tzinfo=timezone.utc),3,7),{"service":"psx-historical-v1","result":calc} if calc else None)
     if any(x in q for x in ("decision","thesis","rationale","lesson","review","risk")):
         filters=[InvestmentDecision.instrument.ilike(f"%{t}%")|InvestmentDecision.rationale.ilike(f"%{t}%")|InvestmentDecision.goal.ilike(f"%{t}%") for t in terms]
         stmt=select(InvestmentDecision).where(InvestmentDecision.user_id==user.id)

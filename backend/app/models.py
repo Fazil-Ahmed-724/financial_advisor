@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
+    BigInteger,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -16,7 +17,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import TSVECTOR, UUID
+from sqlalchemy.dialects.postgresql import JSONB,TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -603,6 +604,18 @@ class MarketplaceProductSplitEvent(Base):
 class MarketplaceResearchPreset(Base):
     __tablename__="marketplace_research_presets";__table_args__=(UniqueConstraint("user_id","name",name="uq_marketplace_research_preset_name"),)
     id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4);user_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"),index=True);name:Mapped[str]=mapped_column(String(100));market_location_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("market_locations.id",ondelete="RESTRICT"));filters:Mapped[dict]=mapped_column(JSON);sorting:Mapped[dict]=mapped_column(JSON);is_default:Mapped[bool]=mapped_column(Boolean,server_default="false");created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now());updated_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now(),onupdate=func.now())
+
+class PsxImportBatch(Base):
+    __tablename__="psx_import_batches";__table_args__=(UniqueConstraint("user_id","idempotency_key",name="uq_psx_import_idempotency"),)
+    id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4);user_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"),index=True);idempotency_key:Mapped[str]=mapped_column(String(120));original_filename:Mapped[str]=mapped_column(String(255));source_name:Mapped[str]=mapped_column(String(200));status:Mapped[str]=mapped_column(String(20));total_rows:Mapped[int]=mapped_column();valid_rows:Mapped[int]=mapped_column();invalid_rows:Mapped[int]=mapped_column();warning_rows:Mapped[int]=mapped_column();committed_rows:Mapped[int]=mapped_column();created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now());committed_at:Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True)
+
+class PsxImportRow(Base):
+    __tablename__="psx_import_rows";__table_args__=(UniqueConstraint("import_batch_id","row_number",name="uq_psx_import_row_number"),)
+    id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4);import_batch_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("psx_import_batches.id",ondelete="CASCADE"),index=True);row_number:Mapped[int]=mapped_column();raw_data:Mapped[dict]=mapped_column(JSONB);normalized_data:Mapped[dict|None]=mapped_column(JSONB,nullable=True);validation_status:Mapped[str]=mapped_column(String(20));warnings:Mapped[list]=mapped_column(JSONB);errors:Mapped[list]=mapped_column(JSONB);duplicate_status:Mapped[str]=mapped_column(String(20));action:Mapped[str]=mapped_column(String(20));created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now())
+
+class PsxPriceObservation(Base):
+    __tablename__="psx_price_observations";__table_args__=(UniqueConstraint("user_id","symbol","observation_date","adjustment_type",name="uq_psx_user_symbol_date_adjustment"),CheckConstraint("open_price>0 AND high_price>0 AND low_price>0 AND close_price>0",name="ck_psx_positive_prices"),CheckConstraint("volume>=0",name="ck_psx_nonnegative_volume"))
+    id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4);user_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"),index=True);import_batch_id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("psx_import_batches.id",ondelete="RESTRICT"),index=True);symbol:Mapped[str]=mapped_column(String(20),index=True);observation_date:Mapped[date]=mapped_column(index=True);open_price:Mapped[Decimal]=mapped_column(Numeric(18,4));high_price:Mapped[Decimal]=mapped_column(Numeric(18,4));low_price:Mapped[Decimal]=mapped_column(Numeric(18,4));close_price:Mapped[Decimal]=mapped_column(Numeric(18,4));volume:Mapped[int]=mapped_column(BigInteger);currency:Mapped[str]=mapped_column(String(3));source_name:Mapped[str]=mapped_column(String(200));adjustment_type:Mapped[str]=mapped_column(String(10));verification_status:Mapped[str]=mapped_column(String(20),server_default="unverified");created_at:Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now())
 
 class AssistantConversation(Base):
     __tablename__="assistant_conversations"

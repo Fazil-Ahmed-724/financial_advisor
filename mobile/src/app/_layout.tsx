@@ -37,6 +37,7 @@ export default function RootLayout() {
           <Stack.Screen name="assistant-evidence" options={{ title: 'Assistant evidence and limitations' }} />
           <Stack.Screen name="assistant-feedback" options={{ title: 'Assistant feedback review' }} />
           <Stack.Screen name="notification-settings" options={{ title: 'Notifications and devices' }} />
+          <Stack.Screen name="psx-research" options={{ title: 'PSX historical research' }} />
         </Stack>
         <StatusBar style="dark" />
       </AuthProvider>
