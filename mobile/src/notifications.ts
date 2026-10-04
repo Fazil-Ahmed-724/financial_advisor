@@ -1,11 +1,17 @@
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
+import Constants, { AppOwnership } from 'expo-constants';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { apiRequest } from '@/api';
 import { NotificationDevice } from '@/types';
 
 const INSTALLATION_KEY='wealth-manager.installation-id';
+const DEVELOPMENT_BUILD_REQUIRED='Remote push notifications require a development build.';
+export function supportsNativeNotifications(){return Constants.appOwnership!==AppOwnership.Expo}
+export async function notificationModule(){
+  if(!supportsNativeNotifications())throw new Error(DEVELOPMENT_BUILD_REQUIRED);
+  return import('expo-notifications');
+}
 export async function installationId(){
   let value=await SecureStore.getItemAsync(INSTALLATION_KEY);
   if(!value){value='xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.floor(Math.random()*16);return (c==='x'?r:(r&3)|8).toString(16)});await SecureStore.setItemAsync(INSTALLATION_KEY,value);}
@@ -14,6 +20,7 @@ export async function installationId(){
 export async function deviceCredentials(){return {installation_id:await installationId(),platform:Platform.OS==='ios'?'ios':'android',device_name:(Device.deviceName||`${Platform.OS} device`).slice(0,80)}}
 export async function registerPush(token:string):Promise<NotificationDevice>{
   if(!Device.isDevice)throw new Error('Push registration requires a physical device and development build.');
+  const Notifications=await notificationModule();
   if(Platform.OS==='android')await Notifications.setNotificationChannelAsync('default',{name:'Informational updates',importance:Notifications.AndroidImportance.DEFAULT});
   let permission=await Notifications.getPermissionsAsync();
   if(permission.status!=='granted')permission=await Notifications.requestPermissionsAsync();

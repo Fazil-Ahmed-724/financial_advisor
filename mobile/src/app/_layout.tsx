@@ -3,11 +3,11 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from '@/auth';
-import * as Notifications from 'expo-notifications';
 import { useEffect } from 'react';
 import { notificationRoute } from '@/notification-routing';
+import { notificationModule, supportsNativeNotifications } from '@/notifications';
 
-function NotificationNavigation(){const{token}=useAuth();useEffect(()=>{const open=(response:Notifications.NotificationResponse|null)=>{const route=notificationRoute(response?.notification.request.content.data,Boolean(token));if(route)router.push(route as never)};Notifications.getLastNotificationResponseAsync().then(open);const subscription=Notifications.addNotificationResponseReceivedListener(open);return()=>subscription.remove()},[token]);return null}
+function NotificationNavigation(){const{token}=useAuth();useEffect(()=>{if(!supportsNativeNotifications())return;let active=true;let remove=()=>{};void notificationModule().then(Notifications=>{if(!active)return;const open=(response:Awaited<ReturnType<typeof Notifications.getLastNotificationResponseAsync>>)=>{const route=notificationRoute(response?.notification.request.content.data,Boolean(token));if(route)router.push(route as never)};void Notifications.getLastNotificationResponseAsync().then(open).catch(()=>{});const subscription=Notifications.addNotificationResponseReceivedListener(open);remove=()=>subscription.remove()}).catch(()=>{});return()=>{active=false;remove()}},[token]);return null}
 
 export default function RootLayout() {
   return (

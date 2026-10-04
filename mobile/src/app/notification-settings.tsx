@@ -1,18 +1,17 @@
 import {useCallback,useState} from 'react';
 import {Text,View} from 'react-native';
 import {useFocusEffect} from 'expo-router';
-import * as Notifications from 'expo-notifications';
 import {ActionButton,Screen,ui} from '@/components';
 import {apiRequest,ApiError,newIdempotencyKey} from '@/api';
 import {useAuth} from '@/auth';
-import {registerPush} from '@/notifications';
+import {notificationModule,registerPush,supportsNativeNotifications} from '@/notifications';
 import {DeviceDiagnostic,NotificationDelivery,NotificationDevice,NotificationEventType,NotificationPreference} from '@/types';
 
 const events:NotificationEventType[]=['reminder_due','assistant_response_ready','feedback_review_status_changed'];
 export default function NotificationSettings(){
   const{token}=useAuth();const[devices,setDevices]=useState<NotificationDevice[]>([]);const[prefs,setPrefs]=useState<NotificationPreference[]>([]);const[history,setHistory]=useState<NotificationDelivery[]>([]);const[diagnostics,setDiagnostics]=useState<DeviceDiagnostic[]>([]);const[selected,setSelected]=useState<string[]>([]);const[armed,setArmed]=useState(false);const[permission,setPermission]=useState('unknown');const[error,setError]=useState('');const[notice,setNotice]=useState('');
   const refresh=useCallback(async()=>{if(!token)return;try{const[d,p,h,g]=await Promise.all([apiRequest<NotificationDevice[]>('/notifications/devices',{},token),apiRequest<NotificationPreference[]>('/notifications/preferences',{},token),apiRequest<NotificationDelivery[]>('/notifications/history',{},token),apiRequest<DeviceDiagnostic[]>('/notifications/diagnostics',{},token)]);setDevices(d);setPrefs(p);setHistory(h);setDiagnostics(g);setError('');}catch(e){setError(e instanceof ApiError?e.message:'Could not load notification settings.');}},[token]);
-  useFocusEffect(useCallback(()=>{void refresh();void Notifications.getPermissionsAsync().then(x=>setPermission(x.status))},[refresh]));
+  useFocusEffect(useCallback(()=>{void refresh();if(!supportsNativeNotifications()){setPermission('development build required');return}void notificationModule().then(Notifications=>Notifications.getPermissionsAsync()).then(x=>setPermission(x.status)).catch(()=>setPermission('unavailable'))},[refresh]));
   async function setup(){if(!token)return;try{await registerPush(token);setNotice('Push token registered. Notifications remain off until you enable this device and event types.');await refresh();}catch(e){setError(e instanceof Error?e.message:'Push registration failed.');}}
   async function deviceEnabled(d:NotificationDevice,enabled:boolean){if(!token)return;try{await apiRequest(`/notifications/devices/${d.id}`,{method:'PUT',body:JSON.stringify({notifications_enabled:enabled})},token);await refresh();}catch(e){setError(e instanceof ApiError?e.message:'Could not update device.');}}
   async function pref(event_type:NotificationEventType,enabled:boolean,device_id?:string){if(!token)return;await apiRequest('/notifications/preferences',{method:'PUT',body:JSON.stringify({event_type,enabled,device_id:device_id||null})},token);await refresh();}
